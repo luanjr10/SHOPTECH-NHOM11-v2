@@ -29,8 +29,8 @@ export interface ProductReviewsResponse {
     current_page: number;
     last_page: number;
     total: number;
+    stats: ReviewStats;
   };
-  stats: ReviewStats;
 }
 
 export interface ProductComment {

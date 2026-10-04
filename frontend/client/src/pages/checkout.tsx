@@ -23,6 +23,8 @@ import { getMyVouchers } from "../services/loyalty";
 import type { MyVoucher } from "../types/loyalty";
 import {
   createMomoPayment,
+  createOnepayPayment,
+  createSepayPayment,
   createVnpayPayment,
 } from "../services/payments";
 import { type ApiError } from "../libs/api";
@@ -75,7 +77,33 @@ const PAYMENT_METHODS: PaymentMethodDef[] = [
     from: "#00519a",
     to: "#0091da",
   },
+  {
+    id: "onepay",
+    name: "OnePay",
+    description: "Thẻ ATM nội địa qua cổng OnePay",
+    monogram: "1",
+    from: "#124b8f",
+    to: "#1e88c7",
+  },
+  {
+    id: "sepay",
+    name: "SePay",
+    description: "Chuyển khoản ngân hàng tự động qua SePay",
+    monogram: "S",
+    from: "#0f8a5f",
+    to: "#33c481",
+  },
 ];
+
+/** Các phương thức chuyển sang cổng thanh toán bên ngoài sau khi đặt hàng. */
+const GATEWAY_METHODS: PaymentMethod[] = ["momo", "vnpay", "onepay", "sepay"];
+
+const createPaymentUrl: Partial<Record<PaymentMethod, (orderId: number) => Promise<string>>> = {
+  momo: createMomoPayment,
+  vnpay: createVnpayPayment,
+  onepay: createOnepayPayment,
+  sepay: createSepayPayment,
+};
 
 export default function CheckoutPage() {
   const { cart, clear } = useCart();
@@ -276,12 +304,9 @@ export default function CheckoutPage() {
       });
       await clear();
 
-      if (paymentMethod === "momo" || paymentMethod === "vnpay") {
-        const payUrl =
-          paymentMethod === "momo"
-            ? await createMomoPayment(order.id)
-            : await createVnpayPayment(order.id);
-        window.location.href = payUrl;
+      const createUrl = createPaymentUrl[paymentMethod];
+      if (createUrl) {
+        window.location.href = await createUrl(order.id);
         return;
       }
 
@@ -653,10 +678,10 @@ export default function CheckoutPage() {
             className="w-full rounded-xl bg-primary500 py-3 font-sans text-[15px] font-bold text-white transition-colors hover:bg-primary500/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting
-              ? paymentMethod === "momo" || paymentMethod === "vnpay"
+              ? GATEWAY_METHODS.includes(paymentMethod)
                 ? "Đang chuyển đến cổng thanh toán..."
                 : "Đang xử lý..."
-              : paymentMethod === "momo" || paymentMethod === "vnpay"
+              : GATEWAY_METHODS.includes(paymentMethod)
                 ? "Tiếp tục thanh toán"
                 : "Đặt hàng"}
           </button>

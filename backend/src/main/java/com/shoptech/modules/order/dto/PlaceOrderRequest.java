@@ -51,7 +51,7 @@ public record PlaceOrderRequest(
         String wardName,
 
         @NotBlank(message = "Vui lòng chọn phương thức thanh toán")
-        @Pattern(regexp = "cod|momo|vnpay", message = "Phương thức thanh toán không hợp lệ")
+        @Pattern(regexp = "cod|momo|vnpay|onepay|sepay", message = "Phương thức thanh toán không hợp lệ")
         String paymentMethod,
 
         @Size(max = 50, message = "Mã giảm giá không hợp lệ")

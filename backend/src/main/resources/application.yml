@@ -103,6 +103,13 @@ app:
       merchant-id: ${SEPAY_MERCHANT_ID:}
       secret-key: ${SEPAY_SECRET_KEY:}
       checkout-url: ${SEPAY_CHECKOUT_URL:https://pay-sandbox.sepay.vn/v1/checkout/init}
+    # Khoá SePay gửi kèm IPN (header X-Secret-Key) khi đơn hàng được thanh toán
+    sepay-ipn-secret: ${SEPAY_IPN_SECRET:}
+  # Chatbot AI trên trang khách hàng (Groq — API tương thích OpenAI)
+  ai:
+    groq:
+      api-key: ${GROQ_API_KEY:}
+      model: ${GROQ_MODEL:openai/gpt-oss-120b}
   # Giao Hàng Nhanh (STAGING khi dev/test) — danh mục tỉnh/quận/phường cho địa chỉ lấy hàng của gian hàng
   ghn:
     api-url: ${GHN_API_URL:https://dev-online-gateway.ghn.vn}
