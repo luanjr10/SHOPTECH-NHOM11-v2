@@ -18,6 +18,8 @@ import {
   Landmark,
   Settings,
   Boxes,
+  TrendingUp,
+  Banknote,
   ChevronsLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -90,6 +92,9 @@ const SELLER_SECTIONS: NavSection[] = [
       { to: "/seller/stores", label: "Gian hàng", icon: Store },
       { to: "/seller/products", label: "Sản phẩm", icon: Package },
       { to: "/seller/inventory", label: "Kho hàng", icon: Boxes },
+      { to: "/seller/revenue", label: "Doanh thu", icon: TrendingUp },
+      { to: "/seller/wallet", label: "Ví", icon: Wallet },
+      { to: "/seller/withdrawals", label: "Rút tiền", icon: Banknote },
     ],
   },
   {

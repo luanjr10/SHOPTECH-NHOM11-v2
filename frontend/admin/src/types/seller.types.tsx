@@ -50,3 +50,40 @@ export interface StockAdjustment {
   reason: string | null;
   created_at: string;
 }
+
+export interface WalletInfo {
+  id: number;
+  balance: number | string;
+  pending_balance: number | string;
+  withdrawable_balance: number | string;
+}
+
+export type WalletTransactionType = "hold" | "release" | "refund" | "debit";
+
+export interface WalletTransaction {
+  id: number;
+  type: WalletTransactionType | string;
+  amount: number | string;
+  balance_after: number | string;
+  reference_type: string | null;
+  reference_id: number | null;
+  description: string | null;
+  created_at: string;
+}
+
+export interface RevenuePoint {
+  date: string;
+  revenue: number;
+  orders_count: number;
+}
+
+export interface RevenueSummary {
+  days: number;
+  orders_count: number;
+  gross_revenue: number;
+  commission_paid: number;
+  net_revenue: number;
+  series: RevenuePoint[];
+}
+
+export type { PayoutMethod, WithdrawalItem } from "./withdrawal.types";
