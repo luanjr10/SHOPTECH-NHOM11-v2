@@ -87,3 +87,56 @@ export interface RevenueSummary {
 }
 
 export type { PayoutMethod, WithdrawalItem } from "./withdrawal.types";
+
+export type SellerOrderStatus = "pending" | "confirmed" | "shipping" | "delivered" | "completed" | "cancelled";
+
+export interface OrderShipment {
+  id: number;
+  provider: string;
+  tracking_number: string | null;
+  status: string | null;
+  expected_delivery_time: string | null;
+}
+
+export interface SellerOrderItem {
+  id: number;
+  store_id: number;
+  status: SellerOrderStatus;
+  subtotal: number | string;
+  shipping_fee: number | string;
+  commission_amount: number | string;
+  seller_amount: number | string;
+  created_at: string;
+  order?: {
+    receiver_name: string;
+    receiver_phone: string;
+    shipping_address: string;
+  };
+  items?: Array<{
+    id: number;
+    product_name: string;
+    sku: string | null;
+    unit_price: number | string;
+    quantity: number;
+    line_total: number | string;
+  }>;
+  shipment?: OrderShipment | null;
+}
+
+export type ReturnRequestType = "return" | "warranty";
+export type ReturnRequestStatus = "pending" | "approved" | "rejected";
+
+export interface ReturnRequestItem {
+  id: number;
+  order_item_id: number;
+  seller_order_id: number;
+  type: ReturnRequestType;
+  reason: string;
+  images: string[];
+  status: ReturnRequestStatus;
+  seller_response: string | null;
+  responded_at: string | null;
+  created_at: string;
+  order_item?: { id: number; product_name: string; sku: string | null; quantity: number };
+  user?: { id: number; name: string; email: string; phone: string | null };
+}
