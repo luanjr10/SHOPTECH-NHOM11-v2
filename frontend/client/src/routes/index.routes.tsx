@@ -6,6 +6,9 @@ import ForgotPassword from "../pages/forgot-password";
 import SellerRegister from "../pages/seller-register";
 import StorePage from "../pages/store";
 import StoresPage from "../pages/stores";
+import CategoryPage from "../pages/category";
+import ProductDetailPage from "../pages/product-detail";
+import SearchPage from "../pages/search";
 import RequireAuth from "../components/auth/RequireAuth";
 import AccountLayout from "../pages/account/AccountLayout";
 import ProfileTab from "../pages/account/ProfileTab";
@@ -16,6 +19,9 @@ import OrdersTab from "../pages/account/OrdersTab";
 import OrderDetailTab from "../pages/account/OrderDetailTab";
 import VouchersTab from "../pages/account/VouchersTab";
 import CartPage from "../pages/cart";
+import CheckoutPage from "../pages/checkout";
+import OrderSuccessPage from "../pages/order-success";
+import PaymentResultPage from "../pages/payment-result";
 
 export const allRoutes = [
   {
@@ -25,6 +31,18 @@ export const allRoutes = [
       {
         index: true,
         element: <Home />,
+      },
+      {
+        path: "/danh-muc/:slug",
+        element: <CategoryPage />,
+      },
+      {
+        path: "/san-pham/:slug",
+        element: <ProductDetailPage />,
+      },
+      {
+        path: "/tim-kiem",
+        element: <SearchPage />,
       },
       {
         path: "/dang-ky-ban-hang",
@@ -67,6 +85,9 @@ export const allRoutes = [
             ],
           },
           { path: "/gio-hang", element: <CartPage /> },
+          { path: "/thanh-toan", element: <CheckoutPage /> },
+          { path: "/dat-hang-thanh-cong", element: <OrderSuccessPage /> },
+          { path: "/thanh-toan/ket-qua", element: <PaymentResultPage /> },
         ],
       },
     ],

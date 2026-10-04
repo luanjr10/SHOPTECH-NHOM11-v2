@@ -34,11 +34,8 @@ pnpm-debug.log*
 # =========================================================
 .idea/
 *.iml
-.claude/
 .vscode/*
 !.vscode/extensions.json
-.codex/
-.cursor/
 .zed/
 *.sw?
 
