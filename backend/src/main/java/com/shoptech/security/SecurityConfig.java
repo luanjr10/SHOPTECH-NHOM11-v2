@@ -39,12 +39,23 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/login", "/api/register", "/api/refresh",
+                                "/api/forgot-password", "/api/verify-reset-code", "/api/reset-password").permitAll()
+                        // Phí ship ở bước thanh toán, chatbot AI, IPN của MoMo (kiểm chữ ký trong service)
+                        .requestMatchers(HttpMethod.POST, "/api/shipping/fee", "/api/ai/chat",
+                                "/api/payments/momo/notify").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/google", "/api/auth/google/callback",
+                                "/api/email/verify/**").permitAll()
+                        // Cổng thanh toán chuyển hướng về (kiểm tra chữ ký / quyền bên trong controller)
+                        .requestMatchers(HttpMethod.GET, "/api/payments/**").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/products", "/api/products/**",
                                 "/api/categories", "/api/categories/**",
                                 "/api/brands", "/api/brands/**",
-                                "/api/use-cases").permitAll()
+                                "/api/use-cases",
+                                "/api/locations/**",
+                                "/api/stores", "/api/stores/**",
+                                "/api/settings/flash-sale").permitAll()
                         // Phân quyền chi tiết (role + module permission) nằm ở @PreAuthorize trên controller.
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())

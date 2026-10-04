@@ -13,7 +13,7 @@ public record ApiResponse<T>(
         boolean success,
         String message,
         T data,
-        PageMeta meta,
+        Object meta,
         Map<String, List<String>> errors
 ) {
 
@@ -25,7 +25,8 @@ public record ApiResponse<T>(
         return new ApiResponse<>(true, message, data, null, null);
     }
 
-    public static <T> ApiResponse<T> page(T data, PageMeta meta) {
+    /** meta thường là PageMeta; một số màn hình trả thêm trường riêng (vd low_stock_threshold). */
+    public static <T> ApiResponse<T> page(T data, Object meta) {
         return new ApiResponse<>(true, null, data, meta, null);
     }
 

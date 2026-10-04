@@ -6,6 +6,18 @@ import {
   FolderTree,
   Tag,
   Users,
+  UserRound,
+  Flame,
+  Store,
+  ShoppingBag,
+  ClipboardList,
+  Star,
+  Percent,
+  Ticket,
+  Wallet,
+  Landmark,
+  Settings,
+  Boxes,
   ChevronsLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -44,7 +56,45 @@ const SECTIONS: NavSection[] = [
       { to: "/categories", label: "Danh mục", icon: FolderTree, module: "categories" },
       { to: "/brands", label: "Thương hiệu", icon: Tag, module: "brands" },
       { to: "/employee", label: "Nhân viên", icon: Users, adminOnly: true },
+      { to: "/customers", label: "Khách hàng", icon: UserRound, module: "customers" },
+      { to: "/home-highlights", label: "Nổi bật trang chủ", icon: Flame, module: "home_highlights" },
     ],
+  },
+  {
+    title: "Sàn TMĐT",
+    items: [
+      { to: "/sellers", label: "Người bán", icon: Store, module: "seller_applications" },
+      { to: "/stores", label: "Gian hàng", icon: ShoppingBag, module: "stores" },
+      { to: "/orders", label: "Đơn hàng & Hóa đơn", icon: ClipboardList, module: "orders" },
+      { to: "/reviews", label: "Đánh giá & Theo dõi", icon: Star, module: "reviews" },
+      { to: "/commissions", label: "Hoa hồng", icon: Percent, module: "commissions" },
+      { to: "/vouchers", label: "Voucher", icon: Ticket, module: "vouchers" },
+      { to: "/withdrawals", label: "Rút tiền", icon: Wallet, module: "withdrawals" },
+      { to: "/platform-funds", label: "Quỹ sàn", icon: Landmark, module: "platform_funds" },
+    ],
+  },
+  {
+    title: "Khác",
+    items: [{ to: "/settings", label: "Cài đặt", icon: Settings }],
+  },
+];
+
+const SELLER_SECTIONS: NavSection[] = [
+  {
+    title: "Tổng quan",
+    items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }],
+  },
+  {
+    title: "Kênh người bán",
+    items: [
+      { to: "/seller/stores", label: "Gian hàng", icon: Store },
+      { to: "/seller/products", label: "Sản phẩm", icon: Package },
+      { to: "/seller/inventory", label: "Kho hàng", icon: Boxes },
+    ],
+  },
+  {
+    title: "Khác",
+    items: [{ to: "/settings", label: "Cài đặt", icon: Settings }],
   },
 ];
 
@@ -92,7 +142,9 @@ function Sidebar({
 
   // Nhân viên chỉ thấy các mục được cấp quyền xem; quản lý nhân viên chỉ dành cho admin.
   const sections: NavSection[] =
-    user?.role === "employee"
+    user?.role === "seller"
+      ? SELLER_SECTIONS
+      : user?.role === "employee"
       ? SECTIONS
           .map((section) => ({
             ...section,

@@ -8,7 +8,7 @@ export default function RequireRole({
   ability = "view",
   children,
 }: {
-  roles: Array<"admin" | "employee">;
+  roles: Array<"admin" | "employee" | "seller">;
   module?: string;
   ability?: "view" | "create" | "edit" | "delete";
   children: React.ReactNode;
@@ -27,7 +27,7 @@ export default function RequireRole({
     return <Navigate to="/login" replace />;
   }
 
-  if (!roles.includes(user.role as "admin" | "employee")) {
+  if (!roles.includes(user.role as "admin" | "employee" | "seller")) {
     return <Navigate to="/" replace />;
   }
 

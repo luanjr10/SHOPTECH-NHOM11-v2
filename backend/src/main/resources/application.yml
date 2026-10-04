@@ -41,6 +41,16 @@ spring:
       filter:
         enabled: true
 
+  # SMTP gửi hoá đơn qua email
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${MAIL_STARTTLS:true}
+
   servlet:
     multipart:
       max-file-size: 10MB
@@ -48,10 +58,59 @@ spring:
 
 app:
   url: ${APP_URL:http://localhost:8000}
+  # Trang quản trị (nhận redirect sau đăng nhập Google, thanh toán rút tiền...) và trang khách hàng
+  admin-url: ${ADMIN_URL:http://localhost:5173}
+  frontend-url: ${FRONTEND_URL:http://localhost:5175}
   frontend-urls: ${FRONTEND_URLS:http://localhost:5173,http://localhost:5175}
   cloudinary-url: ${CLOUDINARY_URL:}
+  # Thư mục file tĩnh cục bộ phục vụ tại /storage/** (ảnh đại diện cũ)
+  storage-dir: ${STORAGE_DIR:storage}
+  mail:
+    from-address: ${MAIL_FROM_ADDRESS:no-reply@shoptech.local}
+    from-name: ${MAIL_FROM_NAME:ShopTech}
   jwt:
     secret: ${JWT_SECRET:change-me-to-a-long-random-secret-at-least-32-bytes}
     ttl-minutes: ${JWT_TTL:60}
     cookie-name: access_token
     cookie-secure: ${JWT_COOKIE_SECURE:false}
+    # Token hết hạn vẫn được gia hạn (POST /api/refresh) trong khoảng thời gian này
+    refresh-ttl-minutes: ${JWT_REFRESH_TTL:20160}
+  auth:
+    reset-code-ttl-seconds: ${RESET_CODE_TTL:300}
+    verify-email-ttl-minutes: ${VERIFY_EMAIL_TTL:60}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8000/api/auth/google/callback}
+  # Cổng thanh toán (sandbox) dùng để giải ngân yêu cầu rút tiền
+  payment:
+    momo:
+      endpoint: ${MOMO_ENDPOINT:https://test-payment.momo.vn/v2/gateway/api/create}
+      partner-code: ${MOMO_PARTNER_CODE:}
+      access-key: ${MOMO_ACCESS_KEY:}
+      secret-key: ${MOMO_SECRET_KEY:}
+    vnpay:
+      url: ${VNPAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      tmn-code: ${VNPAY_TMN_CODE:}
+      hash-secret: ${VNPAY_HASH_SECRET:}
+    onepay:
+      domestic-url: ${ONEPAY_DOMESTIC_URL:https://mtf.onepay.vn/onecomm-pay/vpc.op}
+      merchant-id: ${ONEPAY_MERCHANT_ID:}
+      access-code: ${ONEPAY_ACCESS_CODE:}
+      secure-hash-key: ${ONEPAY_HASH_CODE:}
+      again-link: ${ONEPAY_AGAIN_LINK:}
+    sepay:
+      merchant-id: ${SEPAY_MERCHANT_ID:}
+      secret-key: ${SEPAY_SECRET_KEY:}
+      checkout-url: ${SEPAY_CHECKOUT_URL:https://pay-sandbox.sepay.vn/v1/checkout/init}
+  # Chatbot AI trên trang khách hàng (Groq — API tương thích OpenAI)
+  ai:
+    groq:
+      api-key: ${GROQ_API_KEY:}
+      model: ${GROQ_MODEL:openai/gpt-oss-120b}
+  # Giao Hàng Nhanh (STAGING khi dev/test) — danh mục tỉnh/quận/phường cho địa chỉ lấy hàng của gian hàng
+  ghn:
+    api-url: ${GHN_API_URL:https://dev-online-gateway.ghn.vn}
+    token: ${GHN_TOKEN:}
+    shop-id: ${GHN_SHOP_ID:}
+    allow-production: ${GHN_ALLOW_PRODUCTION:false}
