@@ -30,8 +30,7 @@ public class GoogleAuthService {
     private static final String AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
     private static final String TOKEN_URL = "https://oauth2.googleapis.com/token";
     private static final String USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
-    /** Được đăng nhập trang quản trị (admin + nhân viên + người bán dùng Seller Center). */
-    private static final Set<String> STAFF_ROLES = Set.of(User.ROLE_ADMIN, User.ROLE_EMPLOYEE, User.ROLE_SELLER);
+    private static final Set<String> STAFF_ROLES = Set.of(User.ROLE_ADMIN, User.ROLE_EMPLOYEE);
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final AppProperties props;

@@ -15,11 +15,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,22 +39,6 @@ public class CommissionService {
                         .map(CommissionSetting::getStoreId).filter(Objects::nonNull).collect(Collectors.toSet()))
                 .stream().collect(Collectors.toMap(Store::getId, Store::getName));
         return settings.stream().map(s -> view(s, categories, stores)).toList();
-    }
-
-    /**
-     * Tỉ lệ hoa hồng (%) áp cho một phần đơn lúc đặt hàng — ưu tiên: gian hàng → danh mục → mặc định.
-     * Tỉ lệ được chốt (snapshot) vào seller_orders.commission_rate nên đổi cấu hình sau không ảnh hưởng đơn cũ.
-     */
-    @Transactional(readOnly = true)
-    public BigDecimal resolveRate(Long storeId, Integer categoryId) {
-        return commissionRepository.findFirstByScopeAndStoreId("store", storeId)
-                .filter(CommissionSetting::isActive)
-                .or(() -> categoryId == null ? Optional.empty()
-                        : commissionRepository.findFirstByScopeAndCategoryId("category", categoryId)
-                        .filter(CommissionSetting::isActive))
-                .or(() -> commissionRepository.findFirstByScope("default").filter(CommissionSetting::isActive))
-                .map(CommissionSetting::getRate)
-                .orElse(BigDecimal.ZERO);
     }
 
     /** Tạo mới hoặc cập nhật cấu hình theo (phạm vi + danh mục/gian hàng). */
