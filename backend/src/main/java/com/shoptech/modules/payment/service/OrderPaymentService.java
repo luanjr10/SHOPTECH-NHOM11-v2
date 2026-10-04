@@ -7,27 +7,30 @@ import com.shoptech.modules.order.repository.OrderRepository;
 import com.shoptech.modules.order.repository.SellerOrderRepository;
 import com.shoptech.modules.order.service.CustomerOrderService;
 import com.shoptech.modules.payment.gateway.MomoGateway;
+import com.shoptech.modules.payment.gateway.OnePayGateway;
 import com.shoptech.modules.payment.gateway.PaymentGatewayException;
+import com.shoptech.modules.payment.gateway.SePayGateway;
 import com.shoptech.modules.payment.gateway.VnpayGateway;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 
 /**
- * Thanh toán đơn hàng qua MoMo / VNPay (sandbox). Tạo link thanh toán cho đơn "pending" của chính khách;
+ * Thanh toán đơn hàng qua MoMo / VNPay / OnePay / SePay (sandbox). Tạo link thanh toán cho đơn "pending" của chính khách;
  * cổng trả kết quả (trang return / IPN) → đơn "paid", thất bại → tự huỷ đơn chưa thanh toán.
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class OrderPaymentService {
 
     private final OrderRepository orderRepository;
@@ -35,7 +38,26 @@ public class OrderPaymentService {
     private final CustomerOrderService customerOrderService;
     private final MomoGateway momoGateway;
     private final VnpayGateway vnpayGateway;
+    private final OnePayGateway onePayGateway;
+    private final SePayGateway sePayGateway;
     private final AppProperties props;
+    /** Khoá SePay gửi kèm IPN (header X-Secret-Key). */
+    private final String sepayIpnSecret;
+
+    public OrderPaymentService(OrderRepository orderRepository, SellerOrderRepository sellerOrderRepository,
+                               CustomerOrderService customerOrderService, MomoGateway momoGateway,
+                               VnpayGateway vnpayGateway, OnePayGateway onePayGateway, SePayGateway sePayGateway,
+                               AppProperties props, @Value("${app.payment.sepay-ipn-secret:}") String sepayIpnSecret) {
+        this.orderRepository = orderRepository;
+        this.sellerOrderRepository = sellerOrderRepository;
+        this.customerOrderService = customerOrderService;
+        this.momoGateway = momoGateway;
+        this.vnpayGateway = vnpayGateway;
+        this.onePayGateway = onePayGateway;
+        this.sePayGateway = sePayGateway;
+        this.props = props;
+        this.sepayIpnSecret = sepayIpnSecret;
+    }
 
     @Transactional
     public String createMomoUrl(Long userId, Long orderId) {
@@ -73,13 +95,100 @@ public class OrderPaymentService {
                 "VNPay", params);
     }
 
-    public record Outcome(Long orderId, boolean success) {
+    @Transactional
+    public Outcome handleOnepay(Map<String, String> params) {
+        return finish(params.get("vpc_MerchTxnRef"), onePayGateway.verifyReturn(params), onePayGateway.isSuccess(params),
+                "OnePay", params);
     }
 
-    /** Trang kết quả thanh toán của client. */
+    // ------------------------------------------------------------------ OnePay / SePay
+
+    @Transactional
+    public String createOnepayUrl(Long userId, Long orderId, String clientIp) {
+        Order order = payableOrder(userId, orderId, "onepay");
+        String ref = "OP" + order.getId() + "-" + Instant.now().getEpochSecond();
+        String url = onePayGateway.createPaymentUrl(ref, amount(order), "Thanh toan don hang ShopTech #" + order.getId(),
+                props.backendUrl("/api/payments/onepay/return"), clientIp);
+        saveRef(order, ref);
+        return url;
+    }
+
+    /**
+     * SePay nhận form POST có chữ ký chứ không phải link GET — trả về link trang trung gian của backend
+     * ({@link #sepayCheckoutForm}) để trình duyệt mở rồi tự gửi form sang SePay.
+     */
+    @Transactional
+    public String createSepayUrl(Long userId, Long orderId) {
+        Order order = payableOrder(userId, orderId, "sepay");
+        if (order.getPaymentRef() == null) {
+            saveRef(order, "SEPAY_ORDER" + order.getId() + "_" + Instant.now().getEpochSecond());
+        }
+        return props.backendUrl("/api/payments/sepay/redirect/" + order.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public SePayGateway.CheckoutForm sepayCheckoutForm(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .filter(o -> "sepay".equals(o.getPaymentMethod()) && "pending".equals(o.getStatus())
+                        && o.getPaidAt() == null && o.getPaymentRef() != null)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy đơn hàng chờ thanh toán"));
+        String back = props.backendUrl("/api/payments/sepay/return?order=" + order.getId() + "&status=");
+        return sePayGateway.checkoutForm(order.getPaymentRef(), amount(order),
+                "Thanh toan don hang ShopTech #" + order.getId(), back + "success", back + "error", back + "cancel");
+    }
+
+    /**
+     * SePay trả về trình duyệt KHÔNG kèm chữ ký nên không dùng để xác nhận tiền — đơn chỉ chuyển "paid"
+     * khi nhận IPN (webhook) có khoá bí mật. Ở đây chỉ báo "đang xử lý" hoặc thất bại cho người dùng.
+     */
+    public Outcome sepayReturn(Long orderId, String status) {
+        Order order = orderId == null ? null : orderRepository.findById(orderId).orElse(null);
+        if (order == null) {
+            return new Outcome(null, "failed");
+        }
+        if (order.getPaidAt() != null) {
+            return new Outcome(order.getId(), "success");
+        }
+        return new Outcome(order.getId(), "success".equals(status) ? "pending" : "failed");
+    }
+
+    /** IPN của SePay: header X-Secret-Key phải khớp SEPAY_IPN_SECRET; ORDER_PAID + đủ tiền → "paid". */
+    @Transactional
+    public String handleSepayWebhook(String secretHeader, Map<String, Object> payload) {
+        if (sepayIpnSecret == null || sepayIpnSecret.isBlank() || secretHeader == null
+                || !MessageDigest.isEqual(sepayIpnSecret.getBytes(StandardCharsets.UTF_8),
+                secretHeader.getBytes(StandardCharsets.UTF_8))) {
+            throw ApiException.unauthorized("Unauthorized");
+        }
+        Map<?, ?> orderData = payload.get("order") instanceof Map<?, ?> m ? m : Map.of();
+        Object invoice = orderData.get("order_invoice_number");
+        Order order = invoice == null ? null : orderRepository.findFirstByPaymentRef(invoice.toString()).orElse(null);
+        if (order == null) {
+            log.warn("SePay IPN không khớp đơn nào: {}", payload);
+            return "ignored";
+        }
+        if ("ORDER_PAID".equals(payload.get("notification_type")) && "pending".equals(order.getStatus())
+                && order.getPaidAt() == null) {
+            BigDecimal received = decimal(orderData.get("order_amount"));
+            if (received.compareTo(order.getTotalAmount() == null ? BigDecimal.ZERO : order.getTotalAmount()) < 0) {
+                log.warn("SePay IPN số tiền không khớp đơn #{}: nhận {}", order.getId(), received);
+                return "amount mismatch";
+            }
+            Map<?, ?> tx = payload.get("transaction") instanceof Map<?, ?> t ? t : Map.of();
+            if (tx.get("transaction_id") != null) {
+                order.setSepayTransactionId(tx.get("transaction_id").toString());
+            }
+            markPaid(order);
+        }
+        return "ok";
+    }
+
+    public record Outcome(Long orderId, String status) {
+    }
+
+    /** Trang kết quả thanh toán của client (status: success | pending | failed). */
     public String frontendResultUrl(Outcome outcome) {
-        String url = props.frontendUrl().replaceAll("/+$", "") + "/thanh-toan/ket-qua?status="
-                + (outcome.success() ? "success" : "failed");
+        String url = props.frontendUrl().replaceAll("/+$", "") + "/thanh-toan/ket-qua?status=" + outcome.status();
         return outcome.orderId() == null ? url : url + "&order_id=" + outcome.orderId();
     }
 
@@ -93,13 +202,13 @@ public class OrderPaymentService {
         Order order = ref == null ? null : orderRepository.findFirstByPaymentRef(ref).orElse(null);
         if (order != null && validSignature && success) {
             markPaid(order);
-            return new Outcome(order.getId(), true);
+            return new Outcome(order.getId(), "success");
         }
         if (order != null && validSignature) {
             cancelUnpaid(order);
         }
         log.warn("{} trả kết quả {}: {}", gateway, validSignature ? "thanh toán thất bại" : "sai chữ ký", params);
-        return new Outcome(order == null ? null : order.getId(), false);
+        return new Outcome(order == null ? null : order.getId(), "failed");
     }
 
     /** Chỉ chuyển "pending" → "paid" một lần (return và IPN có thể cùng tới). */
@@ -147,6 +256,14 @@ public class OrderPaymentService {
         order.setPaymentRef(ref);
         order.setUpdatedAt(Instant.now());
         orderRepository.save(order);
+    }
+
+    private static BigDecimal decimal(Object value) {
+        try {
+            return value == null ? BigDecimal.ZERO : new BigDecimal(value.toString().trim());
+        } catch (NumberFormatException e) {
+            return BigDecimal.ZERO;
+        }
     }
 
     private static long amount(Order order) {
