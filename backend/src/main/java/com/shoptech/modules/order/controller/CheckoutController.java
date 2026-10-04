@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 
-/** Trang thanh toán: đặt hàng (COD / MoMo / VNPay). */
+/** Trang thanh toán: đặt hàng (COD / MoMo / VNPay / OnePay / SePay). */
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor

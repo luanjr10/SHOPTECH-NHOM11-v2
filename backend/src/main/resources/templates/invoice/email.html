@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <title th:text="${invoice.invoiceNo}">Hoá đơn</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #1f2937; padding: 24px; max-width: 560px; margin: 0 auto;">
+<h2 style="margin-bottom: 4px;">ShopTech</h2>
+<p style="color: #6b7280; margin-top: 0;" th:text="'Hóa đơn #' + ${invoice.invoiceNo}"></p>
+
+<p th:text="'Xin chào ' + ${invoice.customer.name} + ','"></p>
+<p>
+    Đính kèm email này là hóa đơn cho đơn hàng của bạn tại ShopTech.
+    Trạng thái đơn hiện tại: <strong th:text="${invoice.statusLabel}"></strong>.
+</p>
+
+<table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+    <tr>
+        <td style="padding: 6px 0; color: #6b7280;">Tổng cộng</td>
+        <td style="padding: 6px 0; text-align: right; font-weight: bold; font-size: 16px;"
+            th:text="${fmt.money(invoice.total)}"></td>
+    </tr>
+</table>
+
+<p style="color: #6b7280; font-size: 13px;">
+    Chi tiết đầy đủ sản phẩm, phí vận chuyển và khuyến mãi có trong file PDF đính kèm.
+</p>
+
+<p style="margin-top: 24px;">Cảm ơn bạn đã mua sắm tại ShopTech!</p>
+
+<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;"/>
+<p style="color: #9ca3af; font-size: 11px;">
+    Đây là email tự động, vui lòng không trả lời trực tiếp email này.
+</p>
+</body>
+</html>

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
@@ -17,4 +18,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findTop30ByUserIdOrderByCreatedAtDesc(Long userId);
 
     Page<Order> findByUserId(Long userId, Pageable pageable);
+
+    Optional<Order> findFirstByPaymentRef(String paymentRef);
 }
