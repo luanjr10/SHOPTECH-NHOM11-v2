@@ -16,9 +16,6 @@ import OrdersTab from "../pages/account/OrdersTab";
 import OrderDetailTab from "../pages/account/OrderDetailTab";
 import VouchersTab from "../pages/account/VouchersTab";
 import CartPage from "../pages/cart";
-import CheckoutPage from "../pages/checkout";
-import OrderSuccessPage from "../pages/order-success";
-import PaymentResultPage from "../pages/payment-result";
 
 export const allRoutes = [
   {
@@ -70,9 +67,6 @@ export const allRoutes = [
             ],
           },
           { path: "/gio-hang", element: <CartPage /> },
-          { path: "/thanh-toan", element: <CheckoutPage /> },
-          { path: "/dat-hang-thanh-cong", element: <OrderSuccessPage /> },
-          { path: "/thanh-toan/ket-qua", element: <PaymentResultPage /> },
         ],
       },
     ],

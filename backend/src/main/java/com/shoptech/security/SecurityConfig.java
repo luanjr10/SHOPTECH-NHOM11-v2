@@ -41,9 +41,6 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/login", "/api/register", "/api/refresh",
                                 "/api/forgot-password", "/api/verify-reset-code", "/api/reset-password").permitAll()
-                        // Phí ship ở bước thanh toán, chatbot AI, IPN của MoMo (kiểm chữ ký trong service)
-                        .requestMatchers(HttpMethod.POST, "/api/shipping/fee", "/api/ai/chat",
-                                "/api/payments/momo/notify").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/google", "/api/auth/google/callback",
                                 "/api/email/verify/**").permitAll()
                         // Cổng thanh toán chuyển hướng về (kiểm tra chữ ký / quyền bên trong controller)
@@ -54,8 +51,7 @@ public class SecurityConfig {
                                 "/api/brands", "/api/brands/**",
                                 "/api/use-cases",
                                 "/api/locations/**",
-                                "/api/stores", "/api/stores/**",
-                                "/api/settings/flash-sale").permitAll()
+                                "/api/stores", "/api/stores/**").permitAll()
                         // Phân quyền chi tiết (role + module permission) nằm ở @PreAuthorize trên controller.
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())

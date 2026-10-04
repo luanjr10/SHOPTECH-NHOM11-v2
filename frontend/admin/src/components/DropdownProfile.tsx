@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { Settings } from 'lucide-react';
 import Transition from '../utils/Transition';
 import { useAuth } from '../context/AuthContext';
 
@@ -92,6 +93,15 @@ function DropdownProfile({
             </div>
           </div>
           <ul>
+            <li>
+              <Link
+                to="/settings"
+                onClick={() => setDropdownOpen(false)}
+                className="w-full text-left font-medium text-sm text-gray-600 hover:text-violet-500 dark:text-gray-300 dark:hover:text-violet-400 flex items-center gap-2 py-1.5 px-3"
+              >
+                <Settings className="w-4 h-4" /> Cài đặt
+              </Link>
+            </li>
             <li>
               <button
                 type="button"

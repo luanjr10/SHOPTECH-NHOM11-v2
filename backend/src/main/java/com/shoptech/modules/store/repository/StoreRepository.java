@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface StoreRepository extends JpaRepository<Store, Long> {
 
@@ -18,6 +19,8 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
     List<Store> findBySellerProfileId(Long sellerProfileId, Sort sort);
 
     boolean existsBySlug(String slug);
+
+    Optional<Store> findFirstBySlugAndStatus(String slug, String status);
 
     @Query("select s from Store s where :status is null or s.status = :status")
     Page<Store> search(@Param("status") String status, Pageable pageable);

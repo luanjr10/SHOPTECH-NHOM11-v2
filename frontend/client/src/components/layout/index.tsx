@@ -1,7 +1,6 @@
 import Footer from "./footer";
 import Header from "./header";
 import Main from "./main";
-import { ChatWidget } from "../chat/ChatWidget";
 
 function Layout() {
   return (
@@ -10,7 +9,6 @@ function Layout() {
         <Header />
         <Main />
         <Footer />
-        <ChatWidget />
       </div>
     </>
   );

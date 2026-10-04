@@ -20,6 +20,9 @@ import SellerDashboardPage from "../pages/seller/SellerDashboard";
 import SellerStoresPage from "../pages/seller/SellerStores";
 import SellerProductsPage from "../pages/seller/SellerProducts";
 import SellerInventoryPage from "../pages/seller/SellerInventory";
+import SellerRevenuePage from "../pages/seller/SellerRevenue";
+import SellerWalletPage from "../pages/seller/SellerWallet";
+import SellerWithdrawalsPage from "../pages/seller/SellerWithdrawals";
 import LayoutDefault from "../partials/layout";
 import RequireRole from "../components/RequireRole";
 import { useAuth } from "../context/AuthContext";
@@ -64,6 +67,9 @@ export const routes = [
       { path: "/seller/stores", element: <RequireRole roles={["seller"]}><SellerStoresPage /></RequireRole> },
       { path: "/seller/products", element: <RequireRole roles={["seller"]}><SellerProductsPage /></RequireRole> },
       { path: "/seller/inventory", element: <RequireRole roles={["seller"]}><SellerInventoryPage /></RequireRole> },
+      { path: "/seller/revenue", element: <RequireRole roles={["seller"]}><SellerRevenuePage /></RequireRole> },
+      { path: "/seller/wallet", element: <RequireRole roles={["seller"]}><SellerWalletPage /></RequireRole> },
+      { path: "/seller/withdrawals", element: <RequireRole roles={["seller"]}><SellerWithdrawalsPage /></RequireRole> },
       { path: "/settings", element: <SettingsPage /> },
     ],
   },

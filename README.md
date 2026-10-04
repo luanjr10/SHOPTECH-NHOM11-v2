@@ -47,9 +47,6 @@ Người bán đăng nhập chung trang quản trị, menu hiển thị theo vai
 
 ### Trang khách hàng (frontend/client)
 
-- **Trang chủ** — danh mục, banner, Deal sốc, Flash sale (đếm ngược), sản phẩm nổi bật theo từng danh mục
-- **Thanh toán** — phí vận chuyển GHN theo từng gian hàng (cùng tỉnh miễn phí, giao 2 giờ), mã giảm giá / voucher, đặt hàng tách theo gian hàng, thanh toán COD / MoMo / VNPay (sandbox), trang kết quả thanh toán
-- **Chatbot AI** — trợ lý tư vấn (Groq), tự tra sản phẩm thật theo nhu cầu / ngân sách, gợi ý kèm thẻ sản phẩm
 - **Đăng ký / Đăng nhập** — tài khoản khách hàng (mật khẩu hoặc Google), quên mật khẩu
 - **Giỏ hàng** — lưu theo tài khoản, chọn biến thể, kiểm tra tồn kho, tạm tính theo giá hiện tại
 - **Hồ sơ & cài đặt chung** — hồ sơ, ảnh đại diện, đơn hàng của tôi (xem / huỷ, xác nhận đã nhận hàng), hạng thành viên & nhận voucher theo hạng, sổ địa chỉ (tỉnh / quận / phường GHN), đổi mật khẩu, đăng xuất thiết bị khác
@@ -61,7 +58,7 @@ Người bán đăng nhập chung trang quản trị, menu hiển thị theo vai
 
 | Thành viên     | Chức năng phụ trách                                                                 |
 |----------------|--------------------------------------------------------------------------------------|
-| Bùi Văn Luân   | Dashboard, Quản lý sản phẩm, Quản lý danh mục, Quản lý thương hiệu, Quản lý nhân viên; Kênh người bán: Dashboard, Gian hàng, Sản phẩm, Kho hàng; Trang khách hàng: Trang chủ, Thanh toán MoMo / VNPay, Chatbot AI |
+| Bùi Văn Luân   | Dashboard, Quản lý sản phẩm, Quản lý danh mục, Quản lý thương hiệu, Quản lý nhân viên; Kênh người bán: Dashboard, Gian hàng, Sản phẩm, Kho hàng |
 | Hồ Trọng Dũng  | Khách hàng, Nổi bật trang chủ, Người bán, Gian hàng, Đơn hàng & Hoá đơn, Đánh giá & Theo dõi; Kênh người bán: Đơn hàng & Hoá đơn, Khách hàng, Hoàn trả / Bảo hành, Đánh giá & Theo dõi |
 | Nguyễn Phạm Thành Công | Hoa hồng, Voucher, Rút tiền, Quỹ sàn, Cài đặt tài khoản, Đăng ký / Đăng nhập; Kênh người bán: Doanh thu, Ví, Rút tiền, Cài đặt gian hàng; Trang khách hàng: Đăng ký / Đăng nhập, Giỏ hàng, Hồ sơ & cài đặt chung, Kênh người bán, Gian hàng & chi tiết shop, Yêu cầu hoàn trả |
 

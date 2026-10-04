@@ -1,11 +1,14 @@
 package com.shoptech.modules.store.service;
 
+import com.shoptech.common.exception.ApiException;
 import com.shoptech.common.exception.RequestValidator;
 import com.shoptech.common.exception.Validator;
 import com.shoptech.common.storage.CloudinaryService;
 import com.shoptech.common.storage.ImageRules;
 import com.shoptech.common.util.Slugs;
+import com.shoptech.modules.location.service.LocationService;
 import com.shoptech.modules.seller.entity.SellerProfile;
+import com.shoptech.modules.store.dto.PickupAddressRequest;
 import com.shoptech.modules.store.dto.StoreForm;
 import com.shoptech.modules.store.entity.Store;
 import com.shoptech.modules.store.repository.StoreRepository;
@@ -17,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /** Gian hàng của seller: seller tạo → luôn "pending" chờ admin duyệt, seller không tự đổi trạng thái. */
 @Service
@@ -26,6 +30,7 @@ public class SellerStoreService {
     private final StoreRepository storeRepository;
     private final CloudinaryService cloudinaryService;
     private final RequestValidator requestValidator;
+    private final LocationService locationService;
 
     @Transactional(readOnly = true)
     public List<Store> list(SellerProfile profile) {
@@ -57,6 +62,34 @@ public class SellerStoreService {
         if (hasFile(logo)) {
             store.setLogo(cloudinaryService.uploadImage(logo));
         }
+        store.setUpdatedAt(Instant.now());
+        return storeRepository.saveAndFlush(store);
+    }
+
+    /** Địa chỉ lấy hàng: mã quận/phường phải thuộc đúng tỉnh/quận đã chọn theo danh mục GHN. */
+    @Transactional
+    public Store updatePickupAddress(Store store, PickupAddressRequest request) {
+        requestValidator.validate(request).throwIfFailed();
+
+        Map<String, Object> province = locationService.findProvince(request.provinceId());
+        Map<String, Object> district = province == null ? null
+                : locationService.findDistrict(request.provinceId(), request.districtId());
+        Map<String, Object> ward = district == null ? null
+                : locationService.findWard(request.districtId(), request.wardCode());
+        if (ward == null) {
+            throw ApiException.unprocessable(
+                    "Quận/huyện hoặc phường/xã không thuộc tỉnh/thành phố đã chọn, hoặc không tồn tại.");
+        }
+
+        store.setPickupContactName(request.pickupContactName().trim());
+        store.setPickupPhone(request.pickupPhone());
+        store.setAddressLine(request.addressLine().trim());
+        store.setProvinceId(request.provinceId());
+        store.setProvinceName(String.valueOf(province.get("ProvinceName")));
+        store.setDistrictId(request.districtId());
+        store.setDistrictName(String.valueOf(district.get("DistrictName")));
+        store.setWardCode(request.wardCode());
+        store.setWardName(String.valueOf(ward.get("WardName")));
         store.setUpdatedAt(Instant.now());
         return storeRepository.saveAndFlush(store);
     }

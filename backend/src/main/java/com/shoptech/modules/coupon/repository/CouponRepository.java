@@ -9,7 +9,6 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
 public interface CouponRepository extends JpaRepository<Coupon, Long> {
 
@@ -22,8 +21,6 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
     Page<Coupon> search(@Param("search") String search, Pageable pageable);
 
     boolean existsByCode(String code);
-
-    Optional<Coupon> findFirstByCodeIgnoreCase(String code);
 
     boolean existsByCodeAndIdNot(String code, Long id);
 

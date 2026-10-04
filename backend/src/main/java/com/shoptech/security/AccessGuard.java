@@ -27,6 +27,12 @@ public class AccessGuard {
         return user;
     }
 
+    /** Người dùng nếu request có JWT hợp lệ, null với khách vãng lai (route công khai). */
+    public static AuthUser currentUserOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getPrincipal() instanceof AuthUser user ? user : null;
+    }
+
     /** middleware role:a,b */
     public boolean role(String... roles) {
         AuthUser user = currentUser();

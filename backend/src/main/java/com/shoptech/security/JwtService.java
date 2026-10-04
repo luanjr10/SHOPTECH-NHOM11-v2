@@ -2,6 +2,7 @@ package com.shoptech.security;
 
 import com.shoptech.config.AppProperties;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import org.springframework.http.ResponseCookie;
@@ -60,6 +61,29 @@ public class JwtService {
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Dùng cho gia hạn phiên: chấp nhận token đã hết hạn (chữ ký vẫn phải hợp lệ) nếu chưa quá
+     * khoảng refresh-ttl kể từ lúc phát hành.
+     */
+    public Optional<Claims> parseForRefresh(String token) {
+        Claims claims;
+        try {
+            claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        } catch (ExpiredJwtException e) {
+            claims = e.getClaims();
+        } catch (JwtException | IllegalArgumentException e) {
+            return Optional.empty();
+        }
+        if (claims.getId() != null && blacklist.containsKey(claims.getId())) {
+            return Optional.empty();
+        }
+        Instant issuedAt = claims.getIssuedAt() == null ? Instant.EPOCH : claims.getIssuedAt().toInstant();
+        if (issuedAt.plus(Duration.ofMinutes(config.refreshTtlMinutes())).isBefore(Instant.now())) {
+            return Optional.empty();
+        }
+        return Optional.of(claims);
     }
 
     public void invalidate(String jti, long expEpochSeconds) {
