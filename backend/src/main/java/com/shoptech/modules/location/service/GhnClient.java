@@ -5,6 +5,7 @@ import com.shoptech.config.AppProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -26,6 +27,15 @@ public class GhnClient {
 
     /** GET và trả về trường "data" của response GHN. */
     public Object get(String path, Map<String, ?> query) {
+        return send(path, query, null);
+    }
+
+    /** POST JSON (tính phí, thời gian giao...) và trả về trường "data" của response GHN. */
+    public Object post(String path, Map<String, ?> body) {
+        return send(path, Map.of(), body);
+    }
+
+    private Object send(String path, Map<String, ?> query, Map<String, ?> jsonBody) {
         String baseUrl = config.apiUrl() == null ? "" : config.apiUrl().replaceAll("/+$", "");
         guardProduction(baseUrl);
         if (config.token() == null || config.token().isBlank()) {
@@ -37,17 +47,19 @@ public class GhnClient {
         query.forEach(uri::queryParam);
 
         try {
-            Map<String, Object> body = restClient.get()
+            var request = (jsonBody == null ? restClient.get() : restClient.post())
                     .uri(uri.build().toUri())
                     .headers(h -> {
                         h.set("Token", config.token());
                         if (config.shopId() != null && !config.shopId().isBlank()) {
                             h.set("ShopId", config.shopId());
                         }
-                    })
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<>() {
                     });
+            if (jsonBody != null) {
+                ((RestClient.RequestBodySpec) request).contentType(MediaType.APPLICATION_JSON).body(jsonBody);
+            }
+            Map<String, Object> body = request.retrieve().body(new ParameterizedTypeReference<>() {
+            });
             if (body == null || !(body.get("code") instanceof Number code) || code.intValue() != 200) {
                 throw new RestClientException(body == null ? "empty body" : String.valueOf(body.get("message")));
             }

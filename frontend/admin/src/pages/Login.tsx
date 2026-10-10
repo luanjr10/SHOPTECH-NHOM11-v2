@@ -7,7 +7,7 @@ import { BACKEND_URL } from "../api/axios";
 const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
   google: "Đăng nhập Google thất bại, vui lòng thử lại.",
   google_not_registered:
-    "Email Google này chưa được đăng ký làm tài khoản quản trị/nhân viên. Liên hệ quản trị viên để được cấp tài khoản.",
+    "Email Google này chưa được đăng ký làm tài khoản quản trị/người bán. Liên hệ quản trị viên để được cấp tài khoản.",
   google_no_access: "Tài khoản này không có quyền truy cập trang quản lý.",
 };
 
@@ -38,7 +38,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const user = await login(loginId, password);
-      if (user.role !== "admin" && user.role !== "employee") {
+      if (user.role !== "admin" && user.role !== "employee" && user.role !== "seller") {
         await logout();
         setError("Tài khoản này không có quyền truy cập trang quản lý");
         return;
@@ -73,7 +73,7 @@ export default function LoginPage() {
             Quản trị &amp; vận hành sàn thương mại điện tử của bạn.
           </h1>
           <p className="max-w-md text-violet-100">
-            Một nơi duy nhất cho quản trị viên và nhân viên: quản lý sản phẩm, đơn hàng, gian hàng,
+            Một nơi duy nhất cho quản trị viên và người bán: quản lý sản phẩm, đơn hàng, gian hàng,
             doanh thu và hơn thế nữa.
           </p>
           <div className="flex flex-col gap-3 text-sm text-violet-100">
@@ -96,7 +96,7 @@ export default function LoginPage() {
               <LayoutDashboard className="size-5" />
             </div>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Đăng nhập</h2>
-            <p className="text-sm text-gray-400">Dành cho quản trị viên và nhân viên</p>
+            <p className="text-sm text-gray-400">Dành cho quản trị viên, người bán và nhân viên</p>
           </div>
 
           {info && (
@@ -184,7 +184,7 @@ export default function LoginPage() {
           </button>
 
           <p className="mt-6 text-center text-xs text-gray-400">
-            Chỉ dành cho tài khoản quản trị viên và nhân viên đã được cấp quyền.
+            Chỉ dành cho tài khoản quản trị viên, người bán và nhân viên đã được cấp quyền.
           </p>
         </div>
       </div>
