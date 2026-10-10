@@ -19,7 +19,15 @@ import { placeOrder } from "../services/orders";
 import { fetchAddresses } from "../services/account";
 import { calculateShippingFee } from "../services/shipping";
 import { applyCoupon, type CouponResult } from "../services/coupons";
+import { getAffiliateCode } from "../libs/referral";
 import { getMyVouchers } from "../services/loyalty";
+import { getRedeemableXu } from "../services/xu";
+import { getInstallmentSummary, type InstallmentSummary } from "../services/installments";
+import {
+  fetchStoreInstallment,
+  quoteInstallment,
+  type StoreInstallmentOptions,
+} from "../libs/installment";
 import type { MyVoucher } from "../types/loyalty";
 import {
   createMomoPayment,
@@ -93,6 +101,14 @@ const PAYMENT_METHODS: PaymentMethodDef[] = [
     from: "#0f8a5f",
     to: "#33c481",
   },
+  {
+    id: "installment",
+    name: "Trả góp qua ví MoMo",
+    description: "Gian hàng xét duyệt, trả dần từng kỳ qua MoMo",
+    monogram: "%",
+    from: "#1d4ed8",
+    to: "#60a5fa",
+  },
 ];
 
 /** Các phương thức chuyển sang cổng thanh toán bên ngoài sau khi đặt hàng. */
@@ -132,6 +148,11 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState<string | null>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [myVouchers, setMyVouchers] = useState<MyVoucher[]>([]);
+  const [installmentStore, setInstallmentStore] = useState<StoreInstallmentOptions | null>(null);
+  const [installmentSummary, setInstallmentSummary] = useState<InstallmentSummary | null>(null);
+  const [installmentMonths, setInstallmentMonths] = useState(3);
+  const [useXu, setUseXu] = useState(false);
+  const [xuInfo, setXuInfo] = useState({ balance: 0, max_usable: 0 });
 
   useEffect(() => {
     getMyVouchers()
@@ -211,7 +232,67 @@ export default function CheckoutPage() {
 
   const shippingFee = shippingQuote?.total_fee ?? 0;
   const discountAmount = appliedCoupon?.discount_amount ?? 0;
-  const grandTotal = Math.max(0, subtotal + shippingFee - discountAmount);
+  const xuDiscount = useXu ? xuInfo.max_usable : 0;
+  const grandTotal = Math.max(0, subtotal + shippingFee - discountAmount - xuDiscount);
+
+  // Trả góp do từng gian hàng quyết định, nên chỉ áp dụng khi giỏ chỉ có hàng của một gian hàng.
+  const cartStoreIds = useMemo(
+    () => Array.from(new Set(items.map((i) => i.product?.store_id).filter((id): id is number => Boolean(id)))),
+    [items],
+  );
+  const installmentStoreId = cartStoreIds.length === 1 ? cartStoreIds[0] : null;
+
+  useEffect(() => {
+    getInstallmentSummary()
+      .then(setInstallmentSummary)
+      .catch(() => setInstallmentSummary(null));
+  }, []);
+
+  useEffect(() => {
+    if (!installmentStoreId) {
+      setInstallmentStore(null);
+      return;
+    }
+    fetchStoreInstallment(installmentStoreId)
+      .then((store) => {
+        setInstallmentStore(store);
+        setInstallmentMonths((current) =>
+          store.options.some((o) => o.months === current) ? current : (store.options[0]?.months ?? current),
+        );
+      })
+      .catch(() => setInstallmentStore(null));
+  }, [installmentStoreId]);
+
+  /** Lý do chưa thể chọn trả góp (null nếu dùng được). */
+  const installmentIssue = (() => {
+    if (cartStoreIds.length > 1) return "Trả góp chỉ áp dụng cho đơn của một gian hàng, hãy đặt riêng từng gian hàng.";
+    if (!installmentStore) return "Đang tải điều kiện trả góp của gian hàng...";
+    if (!installmentStore.enabled) return `${installmentStore.store_name} chưa mở bán trả góp.`;
+    if (grandTotal < installmentStore.min_order) {
+      return `Trả góp tại ${installmentStore.store_name} áp dụng cho đơn từ ${formatPrice(installmentStore.min_order)}.`;
+    }
+    if (installmentSummary?.has_overdue) return "Bạn đang có kỳ trả góp quá hạn, vui lòng thanh toán trước.";
+    return null;
+  })();
+  const installmentAvailable = installmentIssue === null;
+
+  useEffect(() => {
+    if (paymentMethod === "installment" && !installmentAvailable) {
+      setPaymentMethod(PAYMENT_METHODS[0].id);
+    }
+  }, [paymentMethod, installmentAvailable]);
+
+  useEffect(() => {
+    if (subtotal <= 0) return;
+    getRedeemableXu(
+      subtotal,
+      discountAmount,
+      Boolean(appliedCoupon?.is_free_ship),
+      Boolean(appliedCoupon?.store_funded),
+    )
+      .then(setXuInfo)
+      .catch(() => setXuInfo({ balance: 0, max_usable: 0 }));
+  }, [subtotal, discountAmount, appliedCoupon?.is_free_ship, appliedCoupon?.store_funded]);
 
   useEffect(() => {
     setAppliedCoupon(null);
@@ -223,7 +304,11 @@ export default function CheckoutPage() {
     setApplyingCoupon(true);
     setCouponError(null);
     try {
-      const result = await applyCoupon(code, subtotal, shippingFee);
+      const phone = addressMode === "saved" ? selectedAddress?.phone : receiverPhone;
+      const storeFees = Object.fromEntries(
+        (shippingQuote?.by_store ?? []).map((row) => [row.store_id, row.fee]),
+      ) as Record<number, number>;
+      const result = await applyCoupon(code, subtotal, shippingFee, phone, storeFees);
       setAppliedCoupon(result);
       setCouponInput(code);
     } catch (err) {
@@ -291,6 +376,7 @@ export default function CheckoutPage() {
           product_id: i.product!.id,
           sku: i.variant?.sku ?? null,
           quantity: i.quantity,
+          aff_code: getAffiliateCode(i.product!.slug),
         })),
         ...shippingInfo,
         province_id: toLocation.provinceId,
@@ -301,8 +387,16 @@ export default function CheckoutPage() {
         ward_name: toLocation.wardName,
         payment_method: paymentMethod,
         coupon_code: appliedCoupon?.code ?? null,
+        use_xu: useXu && xuInfo.max_usable > 0,
+        installment_months: paymentMethod === "installment" ? installmentMonths : null,
       });
       await clear();
+
+      if (paymentMethod === "installment") {
+        // Gian hàng sẽ xem xét và quyết định cho vay; khách thanh toán kỳ 1 sau khi được chấp nhận.
+        navigate("/tai-khoan/tra-gop?requested=1");
+        return;
+      }
 
       const createUrl = createPaymentUrl[paymentMethod];
       if (createUrl) {
@@ -478,16 +572,18 @@ export default function CheckoutPage() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {PAYMENT_METHODS.map((method) => {
                 const active = paymentMethod === method.id;
+                const disabled = method.id === "installment" && !installmentAvailable;
                 return (
                   <button
                     key={method.id}
                     type="button"
+                    disabled={disabled}
                     onClick={() => setPaymentMethod(method.id)}
                     className={`relative flex items-center gap-3 rounded-xl border-2 p-3.5 text-left transition-all ${
                       active
                         ? "border-primary500 bg-primary500/5 shadow-[0_0_0_3px_rgba(215,0,24,0.08)]"
                         : "border-gray-150 hover:border-gray-300"
-                    }`}
+                    } ${disabled ? "cursor-not-allowed opacity-60 hover:border-gray-150" : ""}`}
                   >
                     <span
                       className="flex size-11 shrink-0 items-center justify-center rounded-xl font-sans text-[18px] font-black text-white shadow-sm"
@@ -501,8 +597,8 @@ export default function CheckoutPage() {
                       <span className="block font-sans text-[14px] font-bold text-gray-800">
                         {method.name}
                       </span>
-                      <span className="block font-sans text-[12px] text-gray-500">
-                        {method.description}
+                      <span className={`block font-sans text-[12px] ${disabled ? "text-amber-600" : "text-gray-500"}`}>
+                        {disabled ? installmentIssue : method.description}
                       </span>
                     </span>
                     {active && (
@@ -514,6 +610,42 @@ export default function CheckoutPage() {
                 );
               })}
             </div>
+            {paymentMethod === "installment" && installmentStore && (
+              <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/60 p-3.5">
+                <p className="font-sans text-[13px] font-semibold text-blue-700">
+                  Chọn kỳ hạn trả góp tại {installmentStore.store_name}
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {installmentStore.options.map((option) => {
+                    const quote = quoteInstallment(grandTotal, option);
+                    const active = installmentMonths === option.months;
+                    return (
+                      <button
+                        key={option.months}
+                        type="button"
+                        onClick={() => setInstallmentMonths(option.months)}
+                        className={`rounded-lg border-2 bg-white px-2 py-2 text-center transition-colors ${
+                          active ? "border-blue-500" : "border-transparent hover:border-blue-200"
+                        }`}
+                      >
+                        <span className="block font-sans text-[12px] text-gray-500">{option.months} tháng</span>
+                        <span className="block font-sans text-[14px] font-bold text-blue-700">
+                          {formatPrice(quote.monthlyPayment)}/tháng
+                        </span>
+                        <span className="block font-sans text-[10px] text-gray-400">
+                          {option.monthly_rate === 0 ? "Lãi 0%" : `Lãi ${option.monthly_rate}%/tháng`} · tổng{" "}
+                          {formatPrice(quote.totalPayable)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 font-sans text-[12px] text-gray-500">
+                  Yêu cầu của bạn được gửi cho {installmentStore.store_name} xem xét. Nếu được chấp nhận, bạn thanh toán kỳ 1
+                  qua MoMo để gian hàng chuẩn bị hàng; nếu bị từ chối, đơn sẽ tự hủy và bạn có thể đặt lại bằng cách khác.
+                </p>
+              </div>
+            )}
             <p className="mt-3 flex items-center gap-1.5 font-sans text-[12px] text-gray-400">
               <Truck className="size-3.5" /> Đơn hàng sẽ được xác nhận sau khi bạn nhấn "Đặt hàng".
             </p>
@@ -554,9 +686,17 @@ export default function CheckoutPage() {
           <div className="border-t border-gray-100 pt-3">
             {appliedCoupon ? (
               <div className="flex items-center justify-between gap-2 rounded-xl bg-emerald-50 px-3 py-2.5">
-                <span className="flex items-center gap-1.5 font-sans text-[13px] font-semibold text-emerald-700">
-                  <BadgePercent className="size-4" />
-                  {appliedCoupon.code} — giảm {formatPrice(appliedCoupon.discount_amount)}
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1.5 font-sans text-[13px] font-semibold text-emerald-700">
+                    <BadgePercent className="size-4" />
+                    {appliedCoupon.code} — giảm {formatPrice(appliedCoupon.discount_amount)}
+                  </span>
+                  {appliedCoupon.capped && (
+                    <span className="mt-0.5 block font-sans text-[11px] text-emerald-600">
+                      Đã áp dụng mức giảm tối đa cho đơn này (mã gốc giảm{" "}
+                      {formatPrice(appliedCoupon.original_discount ?? 0)})
+                    </span>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -570,15 +710,23 @@ export default function CheckoutPage() {
             ) : (
               <div className="flex flex-col gap-2.5">
                 {myVouchers.filter(
-                  (v) => v.claimed && (v.remaining_for_me === null || v.remaining_for_me > 0),
+                  (v) =>
+                    v.claimed &&
+                    !v.sold_out &&
+                    (v.remaining_for_me === null || v.remaining_for_me > 0) &&
+                    (v.store_id === null || cartStoreIds.includes(v.store_id)),
                 ).length > 0 && (
                   <div className="flex flex-col gap-1.5">
                     <p className="font-sans text-[12px] font-semibold text-gray-500">
-                      Voucher của bạn (hạng {myVouchers[0]?.target_tier_label ?? ""})
+                      Voucher dành cho bạn
                     </p>
                     <div className="flex flex-col gap-1.5">
                       {myVouchers
-                        .filter((v) => v.claimed && (v.remaining_for_me === null || v.remaining_for_me > 0))
+                        .filter((v) =>
+                    v.claimed &&
+                    !v.sold_out &&
+                    (v.remaining_for_me === null || v.remaining_for_me > 0) &&
+                    (v.store_id === null || cartStoreIds.includes(v.store_id)))
                         .map((v) => (
                           <button
                             key={v.id}
@@ -637,6 +785,27 @@ export default function CheckoutPage() {
             )}
           </div>
 
+          {xuInfo.balance > 0 && (
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <input
+                type="checkbox"
+                checked={useXu}
+                onChange={(e) => setUseXu(e.target.checked)}
+                disabled={xuInfo.max_usable <= 0}
+                className="mt-0.5 size-4"
+              />
+              <span className="font-sans text-[13px] text-gray-700">
+                <span className="font-semibold">Dùng ShopTech Xu</span> — bạn có{" "}
+                {formatPrice(xuInfo.balance).replace("đ", "")} xu
+                <span className="block text-[12px] text-gray-500">
+                  {xuInfo.max_usable > 0
+                    ? `Có thể dùng tối đa ${formatPrice(xuInfo.max_usable).replace("đ", "")} xu cho đơn này`
+                    : "Đơn này chưa thể dùng xu (đã đạt mức giảm tối đa)"}
+                </span>
+              </span>
+            </label>
+          )}
+
           <div className="border-t border-gray-100 pt-3">
             <div className="flex items-center justify-between font-sans text-[14px] text-gray-600">
               <span>Tạm tính</span>
@@ -660,6 +829,12 @@ export default function CheckoutPage() {
                 <span>-{formatPrice(discountAmount)}</span>
               </div>
             )}
+            {xuDiscount > 0 && (
+              <div className="mt-1 flex items-center justify-between font-sans text-[14px] text-amber-600">
+                <span>Dùng xu</span>
+                <span>-{formatPrice(xuDiscount)}</span>
+              </div>
+            )}
             <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-2 font-sans text-[16px] font-bold text-gray-900">
               <span>Tổng cộng</span>
               <span className="text-primary500">{formatPrice(grandTotal)}</span>
@@ -681,9 +856,11 @@ export default function CheckoutPage() {
               ? GATEWAY_METHODS.includes(paymentMethod)
                 ? "Đang chuyển đến cổng thanh toán..."
                 : "Đang xử lý..."
-              : GATEWAY_METHODS.includes(paymentMethod)
-                ? "Tiếp tục thanh toán"
-                : "Đặt hàng"}
+              : paymentMethod === "installment"
+                ? "Gửi yêu cầu trả góp"
+                : GATEWAY_METHODS.includes(paymentMethod)
+                  ? "Tiếp tục thanh toán"
+                  : "Đặt hàng"}
           </button>
         </aside>
       </form>

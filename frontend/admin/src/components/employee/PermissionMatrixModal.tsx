@@ -23,6 +23,7 @@ import {
   UserRound,
   Wallet,
   X,
+  MessageSquare,
 } from "lucide-react";
 import { notifyError, notifySuccess } from "../../helpers/notify";
 import { getEmployeeDetail, updateEmployeePermissions } from "../../services/employee.services";
@@ -41,6 +42,7 @@ const MODULE_ICON: Record<string, typeof Package> = {
   vouchers: Ticket,
   withdrawals: Wallet,
   platform_funds: Landmark,
+  support_chat: MessageSquare,
 };
 
 const SECTION_MAP: Record<string, string> = {
@@ -56,6 +58,7 @@ const SECTION_MAP: Record<string, string> = {
   vouchers: "Sàn TMĐT",
   withdrawals: "Sàn TMĐT",
   platform_funds: "Sàn TMĐT",
+  support_chat: "Sàn TMĐT",
 };
 
 const ABILITY_META = {

@@ -81,7 +81,7 @@ function ProductDetailPage() {
         </div>
         <div className="flex flex-col gap-4">
           <PurchasePanel product={product} />
-          {product.store && <StoreInfoCard store={product.store} />}
+          {product.store && <StoreInfoCard store={product.store} productSlug={product.slug} />}
         </div>
       </div>
 

@@ -6,7 +6,7 @@ export type SellerOrderStatus =
   | "completed"
   | "cancelled";
 export type OrderStatus = "pending" | "paid" | "completed" | "cancelled";
-export type PaymentMethod = "cod" | "momo" | "vnpay" | "onepay" | "sepay";
+export type PaymentMethod = "cod" | "momo" | "vnpay" | "onepay" | "sepay" | "installment";
 
 export interface Shipment {
   id: number;

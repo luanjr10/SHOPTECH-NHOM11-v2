@@ -12,6 +12,14 @@ const TIER_STYLE: Record<string, string> = {
   kim_cuong: "bg-cyan-100 text-cyan-700",
 };
 
+const GROUPS: { kind: MyVoucher["kind"]; title: string }[] = [
+  { kind: "new_customer", title: "Quà chào mừng khách hàng mới" },
+  { kind: "trade_in", title: "Voucher thu cũ đổi mới" },
+  { kind: "daily", title: "Ưu đãi hôm nay" },
+  { kind: "public", title: "Voucher từ gian hàng" },
+  { kind: "tier", title: "Ưu đãi dành cho hạng của bạn" },
+];
+
 function VoucherCard({
   voucher,
   onClaim,
@@ -21,7 +29,8 @@ function VoucherCard({
   onClaim: (id: number) => void;
   claiming: boolean;
 }) {
-  const soldOut = voucher.remaining_for_me !== null && voucher.remaining_for_me <= 0;
+  const soldOut =
+    voucher.sold_out || (voucher.remaining_for_me !== null && voucher.remaining_for_me <= 0);
 
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -35,8 +44,21 @@ function VoucherCard({
         <p className="mt-0.5 line-clamp-2 font-sans text-[12px] text-gray-500">
           {voucher.description ?? `Áp dụng cho đơn từ ${formatPrice(voucher.min_order_amount)}`}
         </p>
+        {voucher.store_name && (
+          <p className="mt-0.5 font-sans text-[11px] font-semibold text-primary500">
+            Voucher của {voucher.store_name} · chỉ dùng cho sản phẩm của gian hàng này
+          </p>
+        )}
         <p className="mt-1 font-sans text-[11px] text-gray-400">
-          Dành cho hạng {voucher.target_tier_label}
+          {voucher.kind === "new_customer"
+            ? "Dành cho khách hàng mới"
+            : voucher.kind === "trade_in"
+              ? `Chỉ dùng cho sản phẩm của ${voucher.store_name ?? "gian hàng"} · riêng tài khoản của bạn`
+              : voucher.kind === "daily"
+                ? "Chỉ áp dụng hôm nay"
+                : voucher.kind === "public"
+                  ? "Dành cho mọi khách hàng"
+                  : `Dành cho hạng ${voucher.target_tier_label}`}
           {voucher.per_user_limit ? ` · Tối đa ${voucher.per_user_limit} lượt/khách` : ""}
           {voucher.claimed && voucher.remaining_for_me !== null
             ? ` · Còn ${voucher.remaining_for_me} lượt`
@@ -44,7 +66,17 @@ function VoucherCard({
         </p>
       </div>
       <div className="shrink-0">
-        {voucher.claimed ? (
+        {!voucher.requires_claim ? (
+          soldOut ? (
+            <span className="rounded-full bg-gray-100 px-3 py-1.5 font-sans text-[12px] font-semibold text-gray-500">
+              {voucher.sold_out ? "Hết lượt hôm nay" : voucher.kind === "daily" ? "Đã dùng hôm nay" : "Đã dùng hết"}
+            </span>
+          ) : (
+            <span className="rounded-full border border-dashed border-primary500/50 bg-primary500/5 px-3 py-1.5 font-mono text-[12px] font-bold text-primary500">
+              {voucher.code}
+            </span>
+          )
+        ) : voucher.claimed ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1.5 font-sans text-[12px] font-semibold text-emerald-600">
             <BadgeCheck className="size-4" /> Đã nhận
           </span>
@@ -156,27 +188,33 @@ function VouchersTab() {
         )}
       </div>
 
-      <div>
-        <h3 className="mb-3 font-sans text-[15px] font-bold text-gray-800">Ưu đãi dành cho hạng của bạn</h3>
+      {message && (
+        <p className="rounded-lg bg-primary500/5 px-3 py-2 font-sans text-[12px] font-medium text-primary500">
+          {message}
+        </p>
+      )}
 
-        {message && (
-          <p className="mb-3 rounded-lg bg-primary500/5 px-3 py-2 font-sans text-[12px] font-medium text-primary500">
-            {message}
-          </p>
-        )}
+      {GROUPS.map((group) => {
+        const list = vouchers.filter((v) => v.kind === group.kind);
+        if (list.length === 0 && group.kind !== "tier") return null;
 
-        {vouchers.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-gray-200 p-4 sm:p-6 text-center font-sans text-[13px] text-gray-400">
-            Hiện chưa có voucher nào dành cho hạng của bạn. Mua thêm để lên hạng và mở khóa ưu đãi!
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {vouchers.map((v) => (
-              <VoucherCard key={v.id} voucher={v} claiming={claimingId === v.id} onClaim={handleClaim} />
-            ))}
+        return (
+          <div key={group.kind}>
+            <h3 className="mb-3 font-sans text-[15px] font-bold text-gray-800">{group.title}</h3>
+            {list.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-gray-200 p-4 sm:p-6 text-center font-sans text-[13px] text-gray-400">
+                Hiện chưa có voucher nào dành cho hạng của bạn. Mua thêm để lên hạng và mở khóa ưu đãi!
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {list.map((v) => (
+                  <VoucherCard key={v.id} voucher={v} claiming={claimingId === v.id} onClaim={handleClaim} />
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })}
     </div>
   );
 }

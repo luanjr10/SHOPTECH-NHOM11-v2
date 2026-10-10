@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   BadgeCheck,
   Check,
   Loader2,
   MessagesSquare,
   Plus,
+  Recycle,
   ShoppingBag,
   ShieldCheck,
   Share2,
@@ -47,6 +49,7 @@ function Stat({
 
 export function StoreProfileHeader({ store }: StoreProfileHeaderProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [following, setFollowing] = useState(!!store.is_following);
   const [followersCount, setFollowersCount] = useState(store.stats?.followers ?? 0);
   const [followLoading, setFollowLoading] = useState(false);
@@ -95,9 +98,22 @@ export function StoreProfileHeader({ store }: StoreProfileHeaderProps) {
             <Share2 className="size-4" />
             <span className="hidden sm:inline">Chia sẻ</span>
           </button>
-          <button aria-label="Thảo luận" className="flex items-center gap-1.5 rounded-lg bg-white/15 px-2.5 py-1.5 font-sans text-[13px] font-medium text-white backdrop-blur transition-colors hover:bg-white/25 cursor-pointer sm:px-3.5 sm:py-2">
+          <Link
+            to={`/thu-cu-doi-moi?store=${store.id}`}
+            aria-label="Thu cũ đổi mới"
+            className="flex items-center gap-1.5 rounded-lg bg-white/15 px-2.5 py-1.5 font-sans text-[13px] font-medium text-white backdrop-blur transition-colors hover:bg-white/25 cursor-pointer sm:px-3.5 sm:py-2"
+          >
+            <Recycle className="size-4" />
+            <span className="hidden sm:inline">Thu cũ đổi mới</span>
+          </Link>
+          <button
+            type="button"
+            aria-label="Chat ngay"
+            onClick={() => navigate(user ? `/tai-khoan/tin-nhan?store=${store.id}` : "/login")}
+            className="flex items-center gap-1.5 rounded-lg bg-white/15 px-2.5 py-1.5 font-sans text-[13px] font-medium text-white backdrop-blur transition-colors hover:bg-white/25 cursor-pointer sm:px-3.5 sm:py-2"
+          >
             <MessagesSquare className="size-4" />
-            <span className="hidden sm:inline">Thảo luận</span>
+            <span className="hidden sm:inline">Chat ngay</span>
           </button>
         </div>
 

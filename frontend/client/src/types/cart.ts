@@ -7,6 +7,7 @@ export interface CartItemResponse {
     name: string;
     slug?: string;
     thumbnail: string | null;
+    store_id?: number | null;
   } | null;
   variant: { sku: string; attributes: ProductVariantAttributes } | null;
   quantity: number;

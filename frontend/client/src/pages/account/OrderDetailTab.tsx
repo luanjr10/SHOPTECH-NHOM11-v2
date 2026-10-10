@@ -91,6 +91,7 @@ const PAYMENT_LABEL: Record<string, string> = {
   vnpay: "VNPay",
   onepay: "OnePay",
   sepay: "SePay",
+  installment: "Trả góp qua ví MoMo",
 };
 
 function formatDate(value: string): string {

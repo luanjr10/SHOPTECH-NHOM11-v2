@@ -9,6 +9,7 @@ import { Button } from "../../ui/button";
 import {
   CircleUserRound,
   FileSearchCorner,
+  Link2,
   LogOut,
   Phone,
   Search,
@@ -78,7 +79,9 @@ function Header() {
                 >
                   {Array.from({ length: 4 }).map((__, i) => (
                     <li key={i} className="font-semibold tracking-wide">
-                      {marqueeText}
+                      <Link to="/thu-cu-doi-moi" tabIndex={copy === 1 ? -1 : 0} className="hover:underline">
+                        {marqueeText}
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -93,6 +96,14 @@ function Header() {
             >
               <Store className="size-4" />
               <span>Kênh người bán</span>
+            </Link>
+            <span className="h-3 w-px bg-white/30" />
+            <Link
+              to="/affiliate"
+              className="flex items-center gap-1.5 whitespace-nowrap font-semibold opacity-90 transition-opacity hover:opacity-100"
+            >
+              <Link2 className="size-4" />
+              <span>Affiliate</span>
             </Link>
             {utilityLinks.map(({ icon: Icon, label, onClick }) => (
               <div key={label} className="flex items-center gap-4">

@@ -2,7 +2,7 @@ import { apiAuthGet, apiPost } from "../libs/api";
 import { type Order, type OrderListResponse, type PaymentMethod } from "../types/order";
 
 export interface PlaceOrderPayload {
-  items: Array<{ product_id: number; sku: string | null; quantity: number }>;
+  items: Array<{ product_id: number; sku: string | null; quantity: number; aff_code?: string | null }>;
   receiver_name: string;
   receiver_phone: string;
   shipping_address: string;
@@ -14,12 +14,18 @@ export interface PlaceOrderPayload {
   ward_name: string;
   payment_method: PaymentMethod;
   coupon_code?: string | null;
+  use_xu?: boolean;
+  installment_months?: number | null;
 }
 
 interface PlaceOrderResponse {
   success: boolean;
   message: string;
-  data: { id: number; total_amount: number };
+  data: {
+    id: number;
+    total_amount: number;
+    installment_plan?: { payments: Array<{ id: number; number: number }> } | null;
+  };
 }
 
 interface OrderDetailResponse {

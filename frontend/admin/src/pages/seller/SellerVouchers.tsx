@@ -3,21 +3,21 @@ import { X } from "lucide-react";
 import { ToastContainer } from "react-toastify";
 import Swal from "sweetalert2";
 import { Button, Label, Modal, ModalBody, ModalHeader, TextInput } from "flowbite-react";
-import DataTable, { Column } from "../components/common/DataTable";
-import RowActions from "../components/common/RowActions";
-import { formatDate } from "../helpers/formatDate";
-import { formatMoneyVietNam } from "../helpers/formatMoney";
-import { notifyError, notifySuccess } from "../helpers/notify";
+import DataTable, { Column } from "../../components/common/DataTable";
+import RowActions from "../../components/common/RowActions";
+import { formatDate } from "../../helpers/formatDate";
+import { formatMoneyVietNam } from "../../helpers/formatMoney";
+import { notifyError, notifySuccess } from "../../helpers/notify";
 import {
   Coupon,
   CouponPayload,
-  createCoupon,
-  deleteCoupon,
-  getCoupons,
-  updateCoupon,
-} from "../services/coupon.services";
-import TierBadge from "../components/customer/TierBadge";
-import { useModulePermission } from "../hooks/useModulePermission";
+  createStoreCoupon,
+  deleteStoreCoupon,
+  getStoreCoupons,
+  updateStoreCoupon,
+} from "../../services/seller.services";
+import { useAuth } from "../../context/AuthContext";
+import TierBadge from "../../components/customer/TierBadge";
 
 const TYPE_LABEL: Record<string, string> = {
   percent: "Giảm theo %",
@@ -32,12 +32,26 @@ const TIER_OPTIONS = [
   { value: "kim_cuong", label: "Kim Cương" },
 ];
 
+const WEEKDAY_OPTIONS = [
+  { value: "", label: "Không giới hạn ngày" },
+  { value: "1", label: "Thứ Hai" },
+  { value: "2", label: "Thứ Ba" },
+  { value: "3", label: "Thứ Tư" },
+  { value: "4", label: "Thứ Năm" },
+  { value: "5", label: "Thứ Sáu" },
+  { value: "6", label: "Thứ Bảy" },
+  { value: "0", label: "Chủ Nhật" },
+];
+
 const emptyForm: CouponPayload = {
   code: "",
   title: "",
   description: "",
   type: "percent",
   target_tier: "",
+  new_customer_only: false,
+  weekday: null,
+  daily_limit: undefined,
   value: 0,
   max_discount: undefined,
   min_order_amount: 0,
@@ -47,7 +61,7 @@ const emptyForm: CouponPayload = {
   is_active: true,
 };
 
-export default function ManageCouponsPage() {
+export default function SellerVouchersPage() {
   const [items, setItems] = useState<Coupon[]>([]);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,10 +73,16 @@ export default function ManageCouponsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<CouponPayload>(emptyForm);
   const codeInputRef = useRef<HTMLInputElement>(null);
-  const { canCreate, canEdit, canDelete } = useModulePermission("vouchers");
+  const { activeStore } = useAuth();
+  const storeId = activeStore?.id;
+  // Chủ gian hàng toàn quyền với voucher của gian hàng mình.
+  const canCreate = true;
+  const canEdit = true;
+  const canDelete = true;
 
   const load = () => {
-    getCoupons({ search: search || undefined, page: currentPage })
+    if (!storeId) return;
+    getStoreCoupons(storeId, { search: search || undefined, page: currentPage })
       .then((res) => {
         const page = res?.data;
         setItems(page?.data ?? []);
@@ -72,7 +92,7 @@ export default function ManageCouponsPage() {
       .catch(() => notifyError("Không tải được danh sách voucher"));
   };
 
-  useEffect(load, [search, currentPage]);
+  useEffect(load, [storeId, search, currentPage]);
 
   const openCreate = () => {
     setMode("create");
@@ -90,6 +110,9 @@ export default function ManageCouponsPage() {
       description: c.description ?? "",
       type: c.type,
       target_tier: c.target_tier ?? "",
+      new_customer_only: c.new_customer_only ?? false,
+      weekday: c.weekday ?? null,
+      daily_limit: c.daily_limit ?? undefined,
       value: Number(c.value ?? 0),
       max_discount: c.max_discount != null ? Number(c.max_discount) : undefined,
       min_order_amount: Number(c.min_order_amount ?? 0),
@@ -111,14 +134,15 @@ export default function ManageCouponsPage() {
       max_discount: form.max_discount || null,
       usage_limit: form.usage_limit || null,
       per_user_limit: form.per_user_limit || null,
+      daily_limit: form.weekday == null ? null : form.daily_limit || null,
     };
 
     try {
       if (mode === "create") {
-        await createCoupon(payload);
+        await createStoreCoupon(storeId!, payload);
         notifySuccess("Đã tạo voucher");
       } else if (editingId) {
-        await updateCoupon(editingId, payload);
+        await updateStoreCoupon(storeId!, editingId, payload);
         notifySuccess("Đã cập nhật voucher");
       }
       setOpenModal(false);
@@ -140,7 +164,7 @@ export default function ManageCouponsPage() {
     }).then(async (result) => {
       if (!result.isConfirmed) return;
       try {
-        await deleteCoupon(c.id);
+        await deleteStoreCoupon(storeId!, c.id);
         notifySuccess("Đã xoá voucher");
         load();
       } catch {
@@ -148,6 +172,15 @@ export default function ManageCouponsPage() {
       }
     });
   };
+
+  if (!activeStore) {
+    return (
+      <div className="flex flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
+        <h2 className="font-sans text-2xl font-bold text-white">Voucher của gian hàng</h2>
+        <p className="text-sm text-gray-400">Bạn cần tạo/chọn 1 gian hàng trước.</p>
+      </div>
+    );
+  }
 
   const isFreeShip = form.type === "free_ship";
 
@@ -174,12 +207,24 @@ export default function ManageCouponsPage() {
     {
       header: "Áp dụng cho hạng",
       align: "center",
-      render: (c) =>
-        c.target_tier ? (
-          <TierBadge tier={c.target_tier} />
-        ) : (
-          <span className="text-xs text-gray-500">Mọi khách hàng</span>
-        ),
+      render: (c) => (
+        <div className="flex flex-col items-center gap-1">
+          {c.new_customer_only && (
+            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-400">
+              Khách hàng mới
+            </span>
+          )}
+          {c.weekday != null && (
+            <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-xs text-sky-400">
+              {WEEKDAY_OPTIONS.find((w) => w.value === String(c.weekday))?.label}
+            </span>
+          )}
+          {c.target_tier && <TierBadge tier={c.target_tier} />}
+          {!c.target_tier && !c.new_customer_only && c.weekday == null && (
+            <span className="text-xs text-gray-500">Mọi khách hàng</span>
+          )}
+        </div>
+      ),
     },
     {
       header: "Đã dùng / Giới hạn",
@@ -229,11 +274,16 @@ export default function ManageCouponsPage() {
 
   return (
     <div className="flex flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
-      <h2 className="font-sans text-2xl font-bold text-white">Quản Lý Voucher</h2>
+      <div>
+        <h2 className="font-sans text-2xl font-bold text-white">Voucher của gian hàng</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          Voucher chỉ áp dụng cho sản phẩm của {activeStore.name} và khoản giảm do gian hàng chịu (trừ vào tiền bạn nhận từ đơn).
+        </p>
+      </div>
 
       <DataTable
         title="Danh Sách Voucher"
-        subtitle="Voucher công khai và voucher hạng thành viên — khách hạng đủ điều kiện có thể bấm Nhận và áp dụng lúc thanh toán."
+        subtitle="Khách thấy voucher của bạn ở trang thanh toán. Mã theo hạng cần khách bấm Nhận; mã khách mới và mã theo thứ tự động hiện."
         data={items}
         columns={columns}
         rowKey={(c) => c.id}
@@ -349,6 +399,61 @@ export default function ManageCouponsPage() {
                   <p className="mt-1 text-xs text-gray-500">
                     VD: khách đã mua trên 10 triệu (hạng Bạc) sẽ thấy và nhận được voucher này.
                   </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <div className="mb-2 block">
+                    <Label htmlFor="weekday">Chỉ áp dụng vào ngày trong tuần</Label>
+                  </div>
+                  <select
+                    id="weekday"
+                    className="w-full rounded-lg border border-gray-700 bg-[#0e1726] px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-500"
+                    value={form.weekday == null ? "" : String(form.weekday)}
+                    onChange={(e) =>
+                      setForm({ ...form, weekday: e.target.value === "" ? null : Number(e.target.value) })
+                    }
+                  >
+                    {WEEKDAY_OPTIONS.map((w) => (
+                      <option key={w.value} value={w.value}>
+                        {w.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Mã theo ngày: tự hiện cho mọi khách vào đúng thứ, mỗi khách dùng 1 lần/ngày.
+                  </p>
+                  {form.weekday != null && (
+                    <div className="mt-3">
+                      <div className="mb-2 block">
+                        <Label htmlFor="daily_limit">Tổng lượt dùng tối đa mỗi ngày</Label>
+                      </div>
+                      <TextInput
+                        id="daily_limit"
+                        type="number"
+                        min={1}
+                        placeholder="Để trống = không giới hạn"
+                        value={form.daily_limit ?? ""}
+                        onChange={(e) =>
+                          setForm({ ...form, daily_limit: e.target.value ? Number(e.target.value) : undefined })
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-start gap-2 pt-8">
+                  <input
+                    id="new_customer_only"
+                    type="checkbox"
+                    className="mt-0.5 size-4"
+                    checked={!!form.new_customer_only}
+                    onChange={(e) => setForm({ ...form, new_customer_only: e.target.checked })}
+                  />
+                  <label htmlFor="new_customer_only" className="text-sm text-gray-300">
+                    Chỉ dành cho khách hàng mới
+                    <span className="block text-xs text-gray-500">Dùng được cho đơn hàng đầu tiên.</span>
+                  </label>
                 </div>
               </div>
 

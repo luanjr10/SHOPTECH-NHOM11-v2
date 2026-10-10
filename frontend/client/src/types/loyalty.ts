@@ -30,11 +30,16 @@ export interface MyVoucher {
   value: number;
   max_discount: number | null;
   min_order_amount: number;
-  target_tier: string;
-  target_tier_label: string;
+  kind: "tier" | "new_customer" | "daily" | "trade_in" | "public";
+  requires_claim: boolean;
+  target_tier: string | null;
+  target_tier_label: string | null;
+  store_id: number | null;
+  store_name: string | null;
   per_user_limit: number | null;
   used_count_by_me: number;
   remaining_for_me: number | null;
   expires_at: string | null;
   claimed: boolean;
+  sold_out: boolean;
 }

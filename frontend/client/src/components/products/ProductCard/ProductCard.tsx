@@ -1,5 +1,13 @@
-import { Heart } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { GitCompareArrows, Heart } from "lucide-react";
+import { MAX_COMPARE, useCompare } from "../../../context/CompareContext";
+import {
+  fetchStoreInstallment,
+  quoteInstallment,
+  type StoreInstallmentOptions,
+} from "../../../libs/installment";
+import { Link, useNavigate } from "react-router-dom";
+import { useWishlist } from "../../../context/WishlistContext";
 import { type Product } from "../../../types/product";
 import { formatPrice } from "../../../libs/format";
 import { StoreBadge } from "../../store/StoreBadge";
@@ -8,7 +16,33 @@ interface ProductCardProps {
   product: Product;
 }
 
+function CardInstallment({ storeId, price }: { storeId?: number | null; price: number }) {
+  const [config, setConfig] = useState<StoreInstallmentOptions | null>(null);
+
+  useEffect(() => {
+    if (!storeId) return;
+    fetchStoreInstallment(storeId)
+      .then(setConfig)
+      .catch(() => setConfig(null));
+  }, [storeId]);
+
+  if (!config || !config.enabled || price < config.min_order) return null;
+
+  const longest = config.options[config.options.length - 1];
+
+  return (
+    <div className="mt-1 hidden rounded-md bg-gray-100 p-1.5 text-[10px] leading-tight text-gray-600 sm:block">
+      Trả góp từ {formatPrice(quoteInstallment(price, longest).monthlyPayment)}/tháng · {longest.months} tháng
+    </div>
+  );
+}
+
 export function ProductCard({ product }: ProductCardProps) {
+  const navigate = useNavigate();
+  const { isWished, toggle } = useWishlist();
+  const wished = isWished(product.id);
+  const { has: hasCompare, toggle: toggleCompare } = useCompare();
+  const compared = hasCompare(product.id);
   const hasDiscount = product.discount_percent > 0;
   const finalPrice = product.final_price || product.price;
 
@@ -64,9 +98,7 @@ export function ProductCard({ product }: ProductCardProps) {
             Smember giảm đến 90%
           </div>
 
-          <div className="mt-1 hidden rounded-md bg-gray-100 p-1.5 sm:block text-[10px] leading-tight text-gray-600">
-            Trả góp 0% - 0đ phụ phí - 0đ trả trước - kỳ hạn đến 12 tháng
-          </div>
+          <CardInstallment storeId={product.store?.id ?? product.store_id} price={finalPrice} />
         </div>
 
         <div className="mt-3 flex w-full shrink-0 items-center justify-between pt-2 text-[12px] text-gray-500">
@@ -74,17 +106,35 @@ export function ProductCard({ product }: ProductCardProps) {
             <span>🚚 2 Giờ</span>
             <span className="ml-1 text-yellow-500">★ 5</span>
           </div>
-          <button
-            type="button"
-            aria-label="Yêu thích"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            className="text-gray-400 transition-colors hover:text-primary500"
-          >
-            <Heart size={16} />
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              aria-label={compared ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
+              title={compared ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!toggleCompare({ id: product.id, name: product.name, thumbnail: product.thumbnail })) {
+                  window.alert(`Chỉ so sánh được tối đa ${MAX_COMPARE} sản phẩm cùng lúc.`);
+                }
+              }}
+              className={`transition-colors hover:text-primary500 ${compared ? "text-primary500" : "text-gray-400"}`}
+            >
+              <GitCompareArrows size={16} />
+            </button>
+            <button
+              type="button"
+              aria-label={wished ? "Bỏ yêu thích" : "Yêu thích"}
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!(await toggle(product.id))) navigate("/login");
+              }}
+              className={`transition-colors hover:text-primary500 ${wished ? "text-primary500" : "text-gray-400"}`}
+            >
+              <Heart size={16} className={wished ? "fill-primary500" : ""} />
+            </button>
+          </div>
         </div>
       </div>
     </Link>

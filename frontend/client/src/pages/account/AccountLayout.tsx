@@ -2,22 +2,35 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
   CircleUserRound,
+  Coins,
   Gem,
+  Heart,
   KeyRound,
+  Landmark,
+  MessageCircle,
   MapPin,
   MonitorSmartphone,
   PackageSearch,
+  Recycle,
   Ticket,
   UserRound,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { getLoyaltySummary } from "../../services/loyalty";
+import { getUnreadCount } from "../../services/chat";
 import type { LoyaltySummary } from "../../types/loyalty";
 
 const navItems = [
   { to: "/tai-khoan", end: true, icon: UserRound, label: "Hồ sơ của tôi" },
   { to: "/tai-khoan/don-hang", icon: PackageSearch, label: "Đơn hàng của tôi" },
   { to: "/tai-khoan/uu-dai", icon: Ticket, label: "Hạng & Ưu đãi của tôi" },
+  { to: "/tai-khoan/tin-nhan", icon: MessageCircle, label: "Tin nhắn" },
+  { to: "/thu-cu-doi-moi", icon: Recycle, label: "Thu cũ đổi mới" },
+  { to: "/tai-khoan/xu", icon: Coins, label: "ShopTech Xu" },
+  { to: "/tai-khoan/tra-gop", icon: Landmark, label: "Trả góp của tôi" },
+  { to: "/tai-khoan/yeu-thich", icon: Heart, label: "Sản phẩm yêu thích" },
+  { to: "/tai-khoan/gioi-thieu", icon: Wallet, label: "Ví Affiliate" },
   { to: "/tai-khoan/dia-chi", icon: MapPin, label: "Địa chỉ giao hàng" },
   { to: "/tai-khoan/doi-mat-khau", icon: KeyRound, label: "Đổi mật khẩu" },
   {
@@ -37,6 +50,16 @@ const TIER_STYLE: Record<string, string> = {
 function AccountLayout() {
   const { user } = useAuth();
   const [loyalty, setLoyalty] = useState<LoyaltySummary | null>(null);
+  const [unreadChats, setUnreadChats] = useState(0);
+
+  useEffect(() => {
+    const load = () => {
+      if (!document.hidden) getUnreadCount().then(setUnreadChats).catch(() => undefined);
+    };
+    load();
+    const timer = window.setInterval(load, 10000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     getLoyaltySummary()
@@ -97,6 +120,11 @@ function AccountLayout() {
                 >
                   <Icon className="size-[18px]" />
                   {label}
+                  {to.endsWith("tin-nhan") && unreadChats > 0 && (
+                    <span className="ml-auto rounded-full bg-primary500 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                      {unreadChats}
+                    </span>
+                  )}
                 </NavLink>
               ))}
             </nav>

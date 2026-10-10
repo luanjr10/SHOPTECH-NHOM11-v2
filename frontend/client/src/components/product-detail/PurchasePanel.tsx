@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Heart, Minus, Plus, ShoppingCart, Star } from "lucide-react";
+import { Check, GitCompareArrows, Heart, Minus, Plus, ShoppingCart, Star } from "lucide-react";
+import { MAX_COMPARE, useCompare } from "../../context/CompareContext";
 import { VariantSelector } from "./VariantSelector";
 import { type ProductDetail, type ProductVariant } from "../../types/product";
 import { formatPrice } from "../../libs/format";
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
+import { useWishlist } from "../../context/WishlistContext";
+import { PriceAlertBox } from "./PriceAlertBox";
+import { InstallmentBadge } from "./InstallmentBadge";
 
 interface PurchasePanelProps {
   product: ProductDetail;
@@ -14,6 +18,10 @@ interface PurchasePanelProps {
 export function PurchasePanel({ product }: PurchasePanelProps) {
   const { user } = useAuth();
   const { addItem } = useCart();
+  const { isWished, toggle } = useWishlist();
+  const wished = isWished(product.id);
+  const { has: hasCompare, toggle: toggleCompare } = useCompare();
+  const compared = hasCompare(product.id);
   const navigate = useNavigate();
   const [selected, setSelected] = useState<ProductVariant>(product.variants[0]);
   const [quantity, setQuantity] = useState(1);
@@ -120,6 +128,8 @@ export function PurchasePanel({ product }: PurchasePanelProps) {
         </p>
       </div>
 
+      <InstallmentBadge storeId={product.store?.id ?? product.store_id} price={currentPrice} />
+
       {selected && (
         <VariantSelector
           variants={product.variants}
@@ -200,12 +210,34 @@ export function PurchasePanel({ product }: PurchasePanelProps) {
         </button>
         <button
           type="button"
-          aria-label="Yêu thích"
-          className="flex items-center justify-center rounded-xl border border-gray-200 px-3 py-2.5 text-gray-400 transition-colors hover:border-primary300 hover:text-primary500"
+          aria-label={wished ? "Bỏ yêu thích" : "Yêu thích"}
+          onClick={async () => {
+            if (!(await toggle(product.id))) navigate("/login");
+          }}
+          className={`flex items-center justify-center rounded-xl border px-3 py-2.5 transition-colors hover:border-primary300 hover:text-primary500 ${
+            wished ? "border-primary300 text-primary500" : "border-gray-200 text-gray-400"
+          }`}
         >
-          <Heart className="size-5" />
+          <Heart className={`size-5 ${wished ? "fill-primary500" : ""}`} />
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          if (!toggleCompare({ id: product.id, name: product.name, thumbnail: product.images[0] ?? null })) {
+            window.alert(`Chỉ so sánh được tối đa ${MAX_COMPARE} sản phẩm cùng lúc.`);
+          }
+        }}
+        className={`flex items-center justify-center gap-2 rounded-xl border py-2 font-sans text-[13px] font-semibold transition-colors ${
+          compared ? "border-primary500 bg-primary500/5 text-primary500" : "border-gray-200 text-gray-600 hover:border-primary300"
+        }`}
+      >
+        <GitCompareArrows className="size-4" />
+        {compared ? "Đã thêm vào so sánh" : "Thêm vào so sánh"}
+      </button>
+
+      {wished && <PriceAlertBox productId={product.id} currentPrice={currentPrice} />}
     </div>
   );
 }
