@@ -4,7 +4,13 @@ import com.shoptech.common.exception.ApiException;
 import com.shoptech.common.exception.ValidationException;
 import com.shoptech.common.response.PagedResult;
 import com.shoptech.common.response.Pagination;
+import com.shoptech.modules.affiliate.service.AffiliateService;
+import com.shoptech.modules.coupon.entity.Coupon;
+import com.shoptech.modules.coupon.repository.CouponRepository;
+import com.shoptech.modules.installment.service.InstallmentService;
 import com.shoptech.modules.inventory.service.StockService;
+import com.shoptech.modules.tradein.service.TradeInService;
+import com.shoptech.modules.xu.service.XuService;
 import com.shoptech.modules.order.dto.Invoice;
 import com.shoptech.modules.order.dto.SellerOrderView;
 import com.shoptech.modules.order.entity.Order;
@@ -65,6 +71,12 @@ public class SellerOrderService {
     private final WalletService walletService;
     private final OrderViewService orderViewService;
     private final InvoiceService invoiceService;
+    private final SellerOrderAmounts amounts;
+    private final CouponRepository couponRepository;
+    private final XuService xuService;
+    private final AffiliateService affiliateService;
+    private final InstallmentService installmentService;
+    private final TradeInService tradeInService;
 
     // ------------------------------------------------------------------ đọc
 
@@ -106,6 +118,10 @@ public class SellerOrderService {
         }
         SellerOrder so = lock(store, id);
         assertTransition(so.getStatus(), status);
+        if ("confirmed".equals(status) && installmentService.isInstallmentOrder(so.getOrderId())
+                && !orderRepository.findById(so.getOrderId()).map(o -> "paid".equals(o.getStatus())).orElse(false)) {
+            throw ApiException.unprocessable("Đơn trả góp chỉ xác nhận được sau khi bạn duyệt khoản vay và khách đã thanh toán kỳ 1.");
+        }
         if ("cancelled".equals(status)) {
             cancel(so);
         } else {
@@ -127,7 +143,9 @@ public class SellerOrderService {
         for (OrderItem item : orderItemRepository.findBySellerOrderIdOrderByIdAsc(so.getId())) {
             stockService.decrement(item.getProductId(), item.getSku(), qty(item), item.getProductName());
         }
-        walletService.holdForOrder(so.getSellerProfileId(), netAmount(so), so.getId());
+        if (!installmentService.isInstallmentOrder(so.getOrderId())) {
+            walletService.holdForOrder(so.getSellerProfileId(), amounts.sellerNet(so), so.getId());
+        }
 
         Order order = orderRepository.findById(so.getOrderId()).orElse(null);
         Instant now = Instant.now();
@@ -191,15 +209,21 @@ public class SellerOrderService {
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy đơn hàng"));
         assertTransition(so.getStatus(), "completed");
 
-        BigDecimal rate = so.getCommissionRate() == null ? BigDecimal.ZERO : so.getCommissionRate();
-        BigDecimal commission = nz(so.getSubtotal()).multiply(rate).movePointLeft(2).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal sellerAmount = nz(so.getSubtotal()).subtract(commission).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal commission = amounts.commission(so);
+        BigDecimal sellerAmount = amounts.sellerNet(so);
         so.setCommissionAmount(commission);
         so.setSellerAmount(sellerAmount);
         so.setCompletedAt(Instant.now());
         setStatus(so, "completed");
 
-        walletService.releaseForOrder(so.getSellerProfileId(), sellerAmount, so.getId());
+        if (!installmentService.isInstallmentOrder(so.getOrderId())) {
+            walletService.releaseForOrder(so.getSellerProfileId(), sellerAmount, so.getId());
+        }
+        Long buyerId = orderRepository.findById(so.getOrderId()).map(Order::getUserId).orElse(null);
+        if (buyerId != null) {
+            affiliateService.recordForCompletedOrder(so, buyerId);
+            xuService.earnForSellerOrder(so, buyerId);
+        }
         syncParentOrderStatus(so);
         return so;
     }
@@ -237,7 +261,9 @@ public class SellerOrderService {
             for (OrderItem item : orderItemRepository.findBySellerOrderIdOrderByIdAsc(so.getId())) {
                 stockService.restore(item.getProductId(), item.getSku(), qty(item));
             }
-            walletService.reverseOrderHold(so.getSellerProfileId(), netAmount(so), so.getId());
+            if (!installmentService.isInstallmentOrder(so.getOrderId())) {
+                walletService.reverseOrderHold(so.getSellerProfileId(), amounts.sellerNet(so), so.getId());
+            }
         }
         setStatus(so, "cancelled");
     }
@@ -253,28 +279,43 @@ public class SellerOrderService {
                 order.setStatus(parentStatus);
                 order.setUpdatedAt(Instant.now());
                 orderRepository.save(order);
+                if ("cancelled".equals(parentStatus)) {
+                    releaseCancelledOrder(order);
+                }
             });
         }
     }
 
-    /** Phần thực nhận giữ trong ví = tạm tính × (1 − tỉ lệ hoa hồng đã chốt lúc đặt). */
-    private static BigDecimal netAmount(SellerOrder so) {
-        BigDecimal rate = so.getCommissionRate() == null ? BigDecimal.ZERO : so.getCommissionRate();
-        return nz(so.getSubtotal()).multiply(BigDecimal.ONE.subtract(rate.movePointLeft(2)))
-                .setScale(2, RoundingMode.HALF_UP);
+    /** Toàn bộ đơn bị huỷ: hoàn xu đã dùng, đóng khoản trả góp và trả lại voucher thu cũ đã dùng. */
+    private void releaseCancelledOrder(Order order) {
+        xuService.refundOrder(order);
+        installmentService.cancelForOrder(order.getId());
+        tradeInService.releaseForOrder(order.getId(), order.getDiscountCode());
     }
 
-    /** COD: tiền thu hộ = tạm tính + phí ship − phần giảm giá chia theo tỉ lệ tạm tính của gian hàng. */
-    private static Long codAmount(Order order, SellerOrder so) {
+    /**
+     * COD: tiền shipper thu = hàng (sau voucher/xu/giảm của gian hàng) + phí ship (sau voucher miễn ship).
+     * Voucher miễn ship của sàn chia theo tỉ lệ tạm tính; của gian hàng giảm đúng phí ship của gian hàng đó.
+     */
+    private Long codAmount(Order order, SellerOrder so) {
         if (order == null || !"cod".equals(order.getPaymentMethod())) {
             return 0L;
         }
-        BigDecimal discount = nz(order.getDiscountAmount());
-        BigDecimal orderSubtotal = nz(order.getTotalAmount()).subtract(nz(order.getShippingFee())).add(discount);
-        BigDecimal discountShare = orderSubtotal.signum() > 0
-                ? discount.multiply(nz(so.getSubtotal())).divide(orderSubtotal, 2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-        BigDecimal cod = nz(so.getSubtotal()).add(nz(so.getShippingFee())).subtract(discountShare);
+        BigDecimal shippingDiscount = BigDecimal.ZERO;
+        if (nz(order.getDiscountAmount()).signum() > 0 && order.getDiscountCode() != null) {
+            Coupon coupon = couponRepository.findFirstByCodeIgnoreCase(order.getDiscountCode()).orElse(null);
+            if (coupon != null && coupon.isFreeShip()) {
+                BigDecimal productsTotal = sellerOrderRepository.findByOrderId(order.getId()).stream()
+                        .map(p -> nz(p.getSubtotal())).reduce(BigDecimal.ZERO, BigDecimal::add);
+                if (productsTotal.signum() > 0) {
+                    shippingDiscount = order.getDiscountAmount().multiply(nz(so.getSubtotal()))
+                            .divide(productsTotal, 2, RoundingMode.HALF_UP);
+                }
+            }
+        }
+        shippingDiscount = shippingDiscount.max(nz(so.getStoreShippingSubsidy()));
+        BigDecimal cod = nz(so.getSubtotal()).subtract(amounts.discountShare(so)).add(nz(so.getShippingFee()))
+                .subtract(shippingDiscount);
         return Math.max(0, cod.setScale(0, RoundingMode.HALF_UP).longValue());
     }
 

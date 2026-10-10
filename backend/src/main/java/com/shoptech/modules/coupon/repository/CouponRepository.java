@@ -21,6 +21,16 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
             """)
     Page<Coupon> search(@Param("search") String search, Pageable pageable);
 
+    /** Voucher do gian hàng phát hành (không gồm voucher thu cũ đổi mới của riêng khách). */
+    @Query("""
+            select c from Coupon c
+            where c.storeId = :storeId and c.tradeInRequestId is null
+              and (:search is null
+                   or c.code like concat('%', :search, '%')
+                   or c.title like concat('%', :search, '%'))
+            """)
+    Page<Coupon> searchByStore(@Param("storeId") Long storeId, @Param("search") String search, Pageable pageable);
+
     boolean existsByCode(String code);
 
     Optional<Coupon> findFirstByCodeIgnoreCase(String code);

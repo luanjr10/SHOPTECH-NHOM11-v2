@@ -42,8 +42,8 @@ public class CouponService {
     private final RequestValidator requestValidator;
 
     @Transactional(readOnly = true)
-    public PagedResult<CouponResponse> list(String search, Integer page, Integer perPage) {
-        Page<Coupon> result = couponRepository.search(search == null || search.isBlank() ? null : search.trim(),
+    public PagedResult<CouponResponse> list(Long storeId, String search, Integer page, Integer perPage) {
+        Page<Coupon> result = couponRepository.searchByStore(storeId, search == null || search.isBlank() ? null : search.trim(),
                 Pagination.of(page, perPage, PER_PAGE, Sort.by("createdAt").descending()));
         List<Long> ids = result.getContent().stream().map(Coupon::getId).toList();
         Map<Long, Long> claims = counts(ids.isEmpty() ? List.of() : couponRepository.countClaims(ids));
@@ -55,22 +55,23 @@ public class CouponService {
     }
 
     @Transactional
-    public Coupon create(CouponRequest req) {
+    public Coupon create(Long storeId, CouponRequest req) {
         Coupon coupon = new Coupon();
+        coupon.setStoreId(storeId);
         apply(coupon, req, null);
         return couponRepository.saveAndFlush(coupon);
     }
 
     @Transactional
-    public Coupon update(Long id, CouponRequest req) {
-        Coupon coupon = find(id);
+    public Coupon update(Long storeId, Long id, CouponRequest req) {
+        Coupon coupon = find(storeId, id);
         apply(coupon, req, id);
         return couponRepository.saveAndFlush(coupon);
     }
 
     @Transactional
-    public void delete(Long id) {
-        couponRepository.delete(find(id));
+    public void delete(Long storeId, Long id) {
+        couponRepository.delete(find(storeId, id));
     }
 
     private void apply(Coupon coupon, CouponRequest req, Long ignoreId) {
@@ -101,6 +102,9 @@ public class CouponService {
         coupon.setDescription(blankToNull(req.description()));
         coupon.setType(req.type());
         coupon.setTargetTier(blankToNull(req.targetTier()));
+        coupon.setNewCustomerOnly(Boolean.TRUE.equals(req.newCustomerOnly()));
+        coupon.setWeekday(req.weekday());
+        coupon.setDailyLimit(req.dailyLimit());
         coupon.setFreeShip("free_ship".equals(req.type()));
         coupon.setValue(req.value() == null ? BigDecimal.ZERO : req.value());
         coupon.setMaxDiscount(req.maxDiscount());
@@ -111,8 +115,11 @@ public class CouponService {
         coupon.setActive(req.isActive() == null || req.isActive());
     }
 
-    private Coupon find(Long id) {
-        return couponRepository.findById(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy voucher"));
+    /** Chỉ thao tác được voucher do chính gian hàng phát hành. */
+    private Coupon find(Long storeId, Long id) {
+        return couponRepository.findById(id)
+                .filter(c -> storeId.equals(c.getStoreId()) && c.getTradeInRequestId() == null)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy voucher"));
     }
 
     /** Nhận ISO có múi giờ, "yyyy-MM-ddTHH:mm[:ss]", "yyyy-MM-dd HH:mm[:ss]" hoặc chỉ ngày (hết ngày đó). */

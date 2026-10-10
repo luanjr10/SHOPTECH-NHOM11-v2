@@ -35,7 +35,7 @@ public record CartSummary(
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record ProductRef(Integer id, String name, String slug, String thumbnail) {
+    public record ProductRef(Integer id, String name, String slug, String thumbnail, Long storeId) {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

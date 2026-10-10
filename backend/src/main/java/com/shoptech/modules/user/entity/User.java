@@ -43,6 +43,10 @@ public class User {
 
     private String role = ROLE_CUSTOMER;
     private Instant emailVerifiedAt;
+    /** Số dư ShopTech Xu (1 xu = 1đ khi thanh toán). */
+    private Integer xuBalance = 0;
+    /** Mã dùng trong link affiliate của khách. */
+    private String referralCode;
     private String password;
     private String rememberToken;
     private Instant createdAt;

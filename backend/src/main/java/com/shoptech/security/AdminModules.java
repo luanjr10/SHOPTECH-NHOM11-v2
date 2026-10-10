@@ -23,10 +23,10 @@ public final class AdminModules {
             new Module("orders", "Đơn hàng & Hóa đơn", List.of("view", "edit")),
             new Module("reviews", "Đánh giá & Theo dõi", List.of("view", "delete")),
             new Module("commissions", "Hoa hồng", List.of("view", "create", "delete")),
-            new Module("vouchers", "Voucher", CRUD),
             new Module("withdrawals", "Rút tiền", List.of("view", "edit")),
             new Module("platform_funds", "Quỹ sàn", List.of("view")),
-            new Module("home_highlights", "Nổi bật trang chủ", List.of("view", "edit"))
+            new Module("home_highlights", "Nổi bật trang chủ", List.of("view", "edit")),
+            new Module("support_chat", "Hỗ trợ khách (chat)", List.of("view", "edit"))
     );
 
     private static final Map<String, Module> BY_KEY = new LinkedHashMap<>();

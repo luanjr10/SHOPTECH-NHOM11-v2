@@ -37,6 +37,22 @@ public class CloudinaryService {
         }
     }
 
+    /** Tệp không phải ảnh (pdf, doc, zip...) — lưu dạng raw, giữ phần đuôi để tải về mở được. */
+    public String uploadFile(MultipartFile file, String folder) {
+        if (cloudinary == null) {
+            throw new IllegalStateException("Chưa cấu hình CLOUDINARY_URL");
+        }
+        try {
+            String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
+            Map<?, ?> result = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
+                    "asset_folder", folder, "resource_type", "raw", "use_filename", true, "unique_filename", true,
+                    "filename_override", name));
+            return (String) result.get("secure_url");
+        } catch (IOException e) {
+            throw new UncheckedIOException("Upload tệp thất bại", e);
+        }
+    }
+
     public String uploadImage(MultipartFile file) {
         return uploadImage(file, DEFAULT_FOLDER);
     }

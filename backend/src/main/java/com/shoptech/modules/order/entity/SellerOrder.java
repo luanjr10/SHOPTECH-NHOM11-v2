@@ -33,6 +33,10 @@ public class SellerOrder {
     private BigDecimal commissionRate;
     private BigDecimal commissionAmount;
     private BigDecimal sellerAmount;
+    /** Phần giảm giá hàng do chính gian hàng chịu (voucher của gian hàng). */
+    private BigDecimal storeDiscount = BigDecimal.ZERO;
+    /** Phần phí ship gian hàng hỗ trợ khách (voucher miễn ship của gian hàng). */
+    private BigDecimal storeShippingSubsidy = BigDecimal.ZERO;
     private Instant completedAt;
     private Instant createdAt;
     private Instant updatedAt;

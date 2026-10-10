@@ -31,6 +31,7 @@ public class Order {
     private String paymentMethod;
     private String discountCode;
     private BigDecimal discountAmount;
+    private Integer xuUsed = 0;
     private String paymentRef;
     private String sepayInvoiceId;
     private String sepayTransactionId;

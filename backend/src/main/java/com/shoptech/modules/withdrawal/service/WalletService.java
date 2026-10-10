@@ -96,6 +96,17 @@ public class WalletService {
         });
     }
 
+    /** Cộng thẳng vào số dư có thể rút (ví dụ tiền trả góp khách đã thanh toán). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void creditAvailable(Long sellerProfileId, BigDecimal amount, String referenceType, Long referenceId,
+                                String description) {
+        SellerWallet wallet = walletRepository.findBySellerProfileIdForUpdate(sellerProfileId).orElseGet(() -> getOrCreate(sellerProfileId));
+        wallet.setBalance(wallet.getBalance().add(amount));
+        wallet.setWithdrawableBalance(wallet.getWithdrawableBalance().add(amount));
+        touch(wallet);
+        log(wallet, "credit", amount, referenceType, referenceId, description);
+    }
+
     /** Huỷ đơn đang giao: bỏ phần tiền đã giữ ở holdForOrder. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void reverseOrderHold(Long sellerProfileId, BigDecimal amount, Long sellerOrderId) {

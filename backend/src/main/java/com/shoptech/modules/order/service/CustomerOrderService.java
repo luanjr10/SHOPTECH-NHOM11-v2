@@ -3,7 +3,10 @@ package com.shoptech.modules.order.service;
 import com.shoptech.common.exception.ApiException;
 import com.shoptech.common.response.PagedResult;
 import com.shoptech.common.response.Pagination;
+import com.shoptech.modules.installment.service.InstallmentService;
 import com.shoptech.modules.order.dto.CustomerOrderView;
+import com.shoptech.modules.tradein.service.TradeInService;
+import com.shoptech.modules.xu.service.XuService;
 import com.shoptech.modules.order.entity.Order;
 import com.shoptech.modules.order.entity.OrderItem;
 import com.shoptech.modules.order.entity.SellerOrder;
@@ -49,6 +52,9 @@ public class CustomerOrderService {
     private final StoreRepository storeRepository;
     private final ReturnRequestRepository returnRepository;
     private final SellerOrderService sellerOrderService;
+    private final XuService xuService;
+    private final InstallmentService installmentService;
+    private final TradeInService tradeInService;
 
     @Transactional(readOnly = true)
     public PagedResult<CustomerOrderView> mine(Long userId, Integer page, Integer perPage) {
@@ -81,6 +87,9 @@ public class CustomerOrderService {
         order.setStatus("cancelled");
         order.setUpdatedAt(now);
         orderRepository.save(order);
+        xuService.refundOrder(order);
+        installmentService.cancelForOrder(order.getId());
+        tradeInService.releaseForOrder(order.getId(), order.getDiscountCode());
         return views(List.of(order), false).get(0);
     }
 

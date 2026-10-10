@@ -33,6 +33,17 @@ public class Coupon {
     private String description;
     private String type;
     private String targetTier;
+    /** Chỉ dành cho khách chưa có đơn hàng nào (không tính đơn đã huỷ). */
+    private boolean newCustomerOnly;
+    /** 0 = Chủ nhật … 6 = Thứ 7 (giờ Việt Nam); null = không giới hạn theo thứ. */
+    private Integer weekday;
+    /** Tổng lượt dùng tối đa mỗi ngày của mã theo thứ. */
+    private Integer dailyLimit;
+    /** Mã riêng của một tài khoản (ví dụ voucher thu cũ đổi mới). */
+    private Long userId;
+    private Long tradeInRequestId;
+    /** Gian hàng phát hành; null = voucher cũ của sàn. */
+    private Long storeId;
 
     @Column(name = "is_free_ship")
     @JsonProperty("is_free_ship")

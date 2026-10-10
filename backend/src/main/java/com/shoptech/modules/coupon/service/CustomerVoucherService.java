@@ -21,32 +21,51 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Voucher dành cho hạng thành viên: khách thấy các voucher đang hoạt động có hạng yêu cầu ≤ hạng của mình,
- * bấm "Nhận" để lưu vào ví voucher (coupon_claims) rồi dùng khi thanh toán.
+ * Ví voucher của khách: voucher theo hạng (phải bấm "Nhận"), voucher khách mới, voucher theo thứ trong tuần,
+ * voucher thu cũ đổi mới của riêng khách và voucher công khai do gian hàng phát. Hai loại cuối và ba loại
+ * không cần nhận tự hiện ở bước thanh toán.
  */
 @Service
 @RequiredArgsConstructor
 public class CustomerVoucherService {
 
     private final CouponRepository couponRepository;
+    private final CouponApplyService couponApplyService;
     private final NamedParameterJdbcTemplate jdbc;
 
     @Transactional(readOnly = true)
     public List<MyVoucher> mine(Long userId) {
         int userRank = rank(tierOf(userId));
+        boolean newCustomer = couponApplyService.isNewCustomer(userId);
+        int today = CouponApplyService.todayWeekday();
         Instant now = Instant.now();
+
         List<Coupon> coupons = couponRepository.findAll().stream()
-                .filter(c -> c.getTargetTier() != null && c.isActive())
+                .filter(Coupon::isActive)
                 .filter(c -> c.getExpiresAt() == null || c.getExpiresAt().isAfter(now))
-                .filter(c -> rank(c.getTargetTier()) <= userRank)
+                .filter(c -> c.getUserId() == null || c.getUserId().equals(userId))
+                .filter(c -> {
+                    if (c.getTradeInRequestId() != null) {
+                        return c.getUsageLimit() == null || nz(c.getUsedCount()) < c.getUsageLimit();
+                    }
+                    if (c.isNewCustomerOnly()) {
+                        return newCustomer;
+                    }
+                    if (c.getWeekday() != null) {
+                        return c.getWeekday() == today;
+                    }
+                    if (c.getTargetTier() != null) {
+                        return rank(c.getTargetTier()) <= userRank;
+                    }
+                    return c.getUsageLimit() == null || nz(c.getUsedCount()) < c.getUsageLimit();
+                })
                 .toList();
         if (coupons.isEmpty()) {
             return List.of();
         }
 
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("userId", userId)
-                .addValue("ids", coupons.stream().map(Coupon::getId).toList());
+        List<Long> ids = coupons.stream().map(Coupon::getId).toList();
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("userId", userId).addValue("ids", ids);
         Set<Long> claimed = new HashSet<>(jdbc.queryForList(
                 "SELECT coupon_id FROM coupon_claims WHERE user_id = :userId AND coupon_id IN (:ids)", params, Long.class));
         Map<Long, Integer> used = new HashMap<>();
@@ -54,14 +73,34 @@ public class CustomerVoucherService {
                 + " GROUP BY coupon_id", params, rs -> {
             used.put(rs.getLong("coupon_id"), rs.getInt("c"));
         });
+        Set<Long> usedToday = new HashSet<>(jdbc.queryForList(
+                "SELECT coupon_id FROM coupon_redemptions WHERE user_id = :userId AND coupon_id IN (:ids) AND created_at >= :since",
+                params.addValue("since", Timestamp.from(CouponApplyService.startOfTodayVn())), Long.class));
+        Map<Long, String> storeNames = new HashMap<>();
+        List<Long> storeIds = coupons.stream().map(Coupon::getStoreId).filter(s -> s != null).distinct().toList();
+        if (!storeIds.isEmpty()) {
+            jdbc.query("SELECT id, name FROM stores WHERE id IN (:ids)", new MapSqlParameterSource("ids", storeIds),
+                    rs -> {
+                        storeNames.put(rs.getLong("id"), rs.getString("name"));
+                    });
+        }
 
         return coupons.stream().map(c -> {
+            String kind = c.getTradeInRequestId() != null ? "trade_in"
+                    : c.isNewCustomerOnly() ? "new_customer"
+                    : c.getWeekday() != null ? "daily"
+                    : c.getTargetTier() != null ? "tier" : "public";
             int usedByMe = used.getOrDefault(c.getId(), 0);
-            return new MyVoucher(c.getId(), c.getCode(), c.getTitle(), c.getDescription(), c.getType(), c.isFreeShip(),
-                    c.getValue(), c.getMaxDiscount(), c.getMinOrderAmount(), c.getTargetTier(), label(c.getTargetTier()),
-                    c.getPerUserLimit(), usedByMe,
-                    c.getPerUserLimit() == null ? null : Math.max(0, c.getPerUserLimit() - usedByMe),
-                    c.getExpiresAt(), claimed.contains(c.getId()));
+            Integer remaining = c.getPerUserLimit() == null ? null : Math.max(0, c.getPerUserLimit() - usedByMe);
+            if ("daily".equals(kind) && usedToday.contains(c.getId())) {
+                remaining = 0;
+            }
+            boolean soldOut = "daily".equals(kind) && couponApplyService.isSoldOutToday(c);
+            return new MyVoucher(kind, "tier".equals(kind), soldOut, c.getId(), c.getCode(), c.getTitle(),
+                    c.getDescription(), c.getType(), c.isFreeShip(), c.getValue(), c.getMaxDiscount(),
+                    c.getMinOrderAmount(), c.getTargetTier(), c.getStoreId(), storeNames.get(c.getStoreId()),
+                    c.getTargetTier() == null ? null : label(c.getTargetTier()), c.getPerUserLimit(), usedByMe,
+                    remaining, c.getExpiresAt(), !"tier".equals(kind) || claimed.contains(c.getId()));
         }).toList();
     }
 
@@ -110,5 +149,9 @@ public class CustomerVoucherService {
     private static String label(String tierKey) {
         return CustomerTiers.TIERS.stream().filter(t -> t.key().equals(tierKey)).findFirst()
                 .orElse(CustomerTiers.TIERS.get(0)).label();
+    }
+
+    private static int nz(Integer v) {
+        return v == null ? 0 : v;
     }
 }

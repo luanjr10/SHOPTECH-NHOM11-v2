@@ -22,6 +22,7 @@ import com.shoptech.modules.product.repository.ProductRepository;
 import com.shoptech.modules.product.repository.ProductSpecificationRepository;
 import com.shoptech.modules.product.repository.ProductUseCaseRepository;
 import com.shoptech.modules.store.dto.StoreSummary;
+import com.shoptech.modules.wishlist.service.WishlistService;
 import com.shoptech.modules.store.entity.Store;
 import com.shoptech.modules.store.repository.StoreRepository;
 import com.shoptech.modules.usecase.document.UseCase;
@@ -62,6 +63,7 @@ public class ProductService {
     private final CloudinaryService cloudinaryService;
     private final RequestValidator requestValidator;
     private final Json json;
+    private final WishlistService wishlistService;
 
     public record ListQuery(String search, String sort, String categoryId, String brandId, String storeId,
                             String provinceId, String useCase, String useCaseId, String isFeatured,
@@ -192,6 +194,8 @@ public class ProductService {
             throw ApiException.unprocessable("Sản phẩm phải có ít nhất một ảnh");
         }
 
+        BigDecimal oldPrice = product.getPrice();
+        int oldDiscount = product.getDiscountPercent() == null ? 0 : product.getDiscountPercent();
         product.setName(form.name().trim());
         applyForm(product, form);
         productRepository.saveAndFlush(product);
@@ -199,6 +203,7 @@ public class ProductService {
         saveImages(product.getId(), all);
         saveSpecification(product, form);
         syncUseCases(product, form);
+        wishlistService.onPriceChanged(product, oldPrice, oldDiscount);
 
         return toDetail(product);
     }

@@ -24,10 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/** Seller Center — voucher do từng gian hàng phát hành: chỉ áp dụng cho sản phẩm của gian hàng, gian hàng chịu chi phí. */
 @RestController
-@RequestMapping("/api/admin/coupons")
+@RequestMapping("/api/seller/stores/{storeId}/coupons")
 @RequiredArgsConstructor
-public class CouponController {
+public class SellerCouponController {
 
     private final CouponService couponService;
 
@@ -37,30 +38,32 @@ public class CouponController {
     }
 
     @GetMapping
-    @PreAuthorize("@access.module('vouchers', 'view')")
+    @PreAuthorize("@seller.owns(#storeId)")
     public CouponListResponse index(
+            @PathVariable Long storeId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Integer page,
             @RequestParam(name = "per_page", required = false) Integer perPage) {
-        return new CouponListResponse(ApiResponse.ok(couponService.list(search, page, perPage)), CustomerTiers.TIERS);
+        return new CouponListResponse(ApiResponse.ok(couponService.list(storeId, search, page, perPage)), CustomerTiers.TIERS);
     }
 
     @PostMapping
-    @PreAuthorize("@access.module('vouchers', 'create')")
-    public ResponseEntity<ApiResponse<Coupon>> create(@RequestBody CouponRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Đã tạo voucher", couponService.create(request)));
+    @PreAuthorize("@seller.owns(#storeId)")
+    public ResponseEntity<ApiResponse<Coupon>> create(@PathVariable Long storeId, @RequestBody CouponRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok("Đã tạo voucher", couponService.create(storeId, request)));
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("@access.module('vouchers', 'edit')")
-    public ApiResponse<Coupon> update(@PathVariable Long id, @RequestBody CouponRequest request) {
-        return ApiResponse.ok("Đã cập nhật voucher", couponService.update(id, request));
+    @PreAuthorize("@seller.owns(#storeId)")
+    public ApiResponse<Coupon> update(@PathVariable Long storeId, @PathVariable Long id, @RequestBody CouponRequest request) {
+        return ApiResponse.ok("Đã cập nhật voucher", couponService.update(storeId, id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@access.module('vouchers', 'delete')")
-    public ApiResponse<Void> delete(@PathVariable Long id) {
-        couponService.delete(id);
+    @PreAuthorize("@seller.owns(#storeId)")
+    public ApiResponse<Void> delete(@PathVariable Long storeId, @PathVariable Long id) {
+        couponService.delete(storeId, id);
         return ApiResponse.message("Đã xoá voucher");
     }
 }

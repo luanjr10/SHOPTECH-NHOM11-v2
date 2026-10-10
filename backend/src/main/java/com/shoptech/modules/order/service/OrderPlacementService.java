@@ -3,8 +3,11 @@ package com.shoptech.modules.order.service;
 import com.shoptech.common.exception.ApiException;
 import com.shoptech.common.exception.RequestValidator;
 import com.shoptech.common.util.Json;
+import com.shoptech.modules.affiliate.service.AffiliateService;
 import com.shoptech.modules.commission.service.CommissionService;
+import com.shoptech.modules.coupon.entity.Coupon;
 import com.shoptech.modules.coupon.service.CouponApplyService;
+import com.shoptech.modules.installment.service.InstallmentService;
 import com.shoptech.modules.order.dto.PlaceOrderRequest;
 import com.shoptech.modules.order.entity.Order;
 import com.shoptech.modules.order.entity.OrderItem;
@@ -20,6 +23,8 @@ import com.shoptech.modules.product.service.ProductPricing;
 import com.shoptech.modules.shipping.service.ShippingService;
 import com.shoptech.modules.store.entity.Store;
 import com.shoptech.modules.store.repository.StoreRepository;
+import com.shoptech.modules.tradein.service.TradeInService;
+import com.shoptech.modules.xu.service.XuService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,8 +39,9 @@ import java.util.Map;
 
 /**
  * Đặt hàng: tách đơn theo gian hàng (mỗi gian hàng một seller_order), tính giá theo biến thể hiện tại,
- * phí ship GHN theo từng gian hàng, áp mã giảm giá và chốt tỉ lệ hoa hồng tại thời điểm đặt.
- * Chưa trừ kho ở bước này — kho chỉ trừ khi người bán bàn giao vận chuyển.
+ * phí ship GHN theo từng gian hàng, áp mã giảm giá (voucher gian hàng do gian hàng chịu, voucher sàn bị cắt trần
+ * bằng hoa hồng), trừ ShopTech Xu, ghi nhận người giới thiệu affiliate theo từng dòng hàng và chốt tỉ lệ hoa hồng
+ * tại thời điểm đặt. Chưa trừ kho ở bước này — kho chỉ trừ khi người bán bàn giao vận chuyển.
  */
 @Service
 @RequiredArgsConstructor
@@ -50,10 +56,15 @@ public class OrderPlacementService {
     private final ShippingService shippingService;
     private final CouponApplyService couponApplyService;
     private final CommissionService commissionService;
+    private final XuService xuService;
+    private final AffiliateService affiliateService;
+    private final InstallmentService installmentService;
+    private final TradeInService tradeInService;
     private final RequestValidator requestValidator;
     private final Json json;
 
-    private record Line(Product product, String sku, BigDecimal unitPrice, int quantity, BigDecimal lineTotal) {
+    private record Line(Product product, String sku, BigDecimal unitPrice, int quantity, BigDecimal lineTotal,
+                        AffiliateService.Attribution affiliate) {
     }
 
     @Transactional
@@ -78,7 +89,8 @@ public class OrderPlacementService {
                 throw ApiException.unprocessable("Sản phẩm '" + product.getName() + "' chỉ còn " + available + " trong kho");
             }
             groups.computeIfAbsent(product.getStoreId(), k -> new ArrayList<>()).add(new Line(product, sku, unitPrice,
-                    quantity, unitPrice.multiply(BigDecimal.valueOf(quantity)).setScale(2, RoundingMode.HALF_UP)));
+                    quantity, unitPrice.multiply(BigDecimal.valueOf(quantity)).setScale(2, RoundingMode.HALF_UP),
+                    affiliateService.attribute(userId, product, item.affCode())));
         }
 
         BigDecimal productsSubtotal = groups.values().stream().flatMap(List::stream)
@@ -89,9 +101,36 @@ public class OrderPlacementService {
                 request.districtId(), request.wardCode(), request.provinceId());
         BigDecimal totalShipping = BigDecimal.valueOf(quote.totalFee());
 
-        CouponApplyService.Result coupon = request.couponCode() == null || request.couponCode().isBlank() ? null
-                : couponApplyService.apply(request.couponCode(), productsSubtotal, userId, totalShipping);
-        BigDecimal discount = coupon == null ? BigDecimal.ZERO : coupon.discountAmount();
+        // Tỉ lệ hoa hồng chốt theo từng gian hàng: một danh mục duy nhất thì theo danh mục, nhiều danh mục thì theo gian hàng.
+        Map<Long, BigDecimal> rateByStore = new LinkedHashMap<>();
+        List<CommissionService.Group> commissionGroups = new ArrayList<>();
+        Map<Long, BigDecimal> storeSubtotals = new LinkedHashMap<>();
+        Map<Long, BigDecimal> storeShippingFees = new LinkedHashMap<>();
+        for (var entry : groups.entrySet()) {
+            List<Integer> categoryIds = entry.getValue().stream().map(l -> l.product().getCategoryId()).distinct().toList();
+            Integer categoryId = categoryIds.size() == 1 ? categoryIds.get(0) : null;
+            BigDecimal subtotal = entry.getValue().stream().map(Line::lineTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+            rateByStore.put(entry.getKey(), commissionService.resolveRate(entry.getKey(), categoryId));
+            commissionGroups.add(new CommissionService.Group(entry.getKey(), subtotal, categoryId));
+            storeSubtotals.put(entry.getKey(), subtotal);
+            storeShippingFees.put(entry.getKey(), BigDecimal.valueOf(quote.feeFor(entry.getKey())));
+        }
+        BigDecimal commissionTotal = commissionService.estimateTotal(commissionGroups);
+
+        CouponApplyService.Result applied = request.couponCode() == null || request.couponCode().isBlank() ? null
+                : couponApplyService.apply(request.couponCode(), productsSubtotal, userId, totalShipping, commissionTotal,
+                request.receiverPhone(), storeSubtotals, storeShippingFees);
+        Coupon coupon = applied == null ? null : applied.coupon();
+        BigDecimal discount = applied == null ? BigDecimal.ZERO : applied.discountAmount();
+        boolean storeFunded = coupon != null && coupon.getStoreId() != null;
+        BigDecimal platformDiscount = storeFunded ? BigDecimal.ZERO : discount;
+
+        int xuUsed = 0;
+        if (Boolean.TRUE.equals(request.useXu())) {
+            BigDecimal productDiscount = coupon != null && !coupon.isFreeShip() ? discount : BigDecimal.ZERO;
+            xuUsed = xuService.maxRedeemable(userId, productsSubtotal.subtract(productDiscount),
+                    commissionTotal.subtract(platformDiscount));
+        }
 
         Instant now = Instant.now();
         Order order = new Order();
@@ -101,8 +140,9 @@ public class OrderPlacementService {
         order.setShippingFee(totalShipping);
         order.setExpectedDeliveryTime(quote.expectedDeliveryTime());
         order.setPaymentMethod(request.paymentMethod());
-        order.setDiscountCode(coupon == null ? null : coupon.coupon().getCode());
+        order.setDiscountCode(coupon == null ? null : coupon.getCode());
         order.setDiscountAmount(discount);
+        order.setXuUsed(xuUsed);
         order.setReceiverName(request.receiverName().trim());
         order.setReceiverPhone(request.receiverPhone());
         order.setShippingAddress(request.shippingAddress().trim());
@@ -117,7 +157,11 @@ public class OrderPlacementService {
         orderRepository.saveAndFlush(order);
 
         if (coupon != null) {
-            couponApplyService.redeem(coupon.coupon(), userId, order.getId());
+            couponApplyService.redeem(coupon, userId, order.getId());
+            tradeInService.markUsedByOrder(coupon, order.getId());
+        }
+        if (xuUsed > 0) {
+            xuService.spendOnOrder(userId, order.getId(), xuUsed);
         }
 
         BigDecimal orderSubtotal = BigDecimal.ZERO;
@@ -126,9 +170,7 @@ public class OrderPlacementService {
                     .orElseThrow(() -> ApiException.unprocessable("Gian hàng #" + entry.getKey() + " không tồn tại"));
             List<Line> lines = entry.getValue();
             BigDecimal subtotal = lines.stream().map(Line::lineTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
-            // Một danh mục duy nhất thì áp tỉ lệ theo danh mục, nhiều danh mục thì theo gian hàng / mặc định.
-            List<Integer> categoryIds = lines.stream().map(l -> l.product().getCategoryId()).distinct().toList();
-            BigDecimal rate = commissionService.resolveRate(store.getId(), categoryIds.size() == 1 ? categoryIds.get(0) : null);
+            boolean couponBelongsHere = storeFunded && store.getId().equals(coupon.getStoreId());
 
             SellerOrder so = new SellerOrder();
             so.setOrderId(order.getId());
@@ -137,9 +179,11 @@ public class OrderPlacementService {
             so.setStatus("pending");
             so.setSubtotal(subtotal);
             so.setShippingFee(BigDecimal.valueOf(quote.feeFor(store.getId())));
-            so.setCommissionRate(rate);
+            so.setCommissionRate(rateByStore.get(store.getId()));
             so.setCommissionAmount(BigDecimal.ZERO);
             so.setSellerAmount(BigDecimal.ZERO);
+            so.setStoreDiscount(couponBelongsHere && !coupon.isFreeShip() ? discount : BigDecimal.ZERO);
+            so.setStoreShippingSubsidy(couponBelongsHere && coupon.isFreeShip() ? discount : BigDecimal.ZERO);
             so.setCreatedAt(now);
             so.setUpdatedAt(now);
             sellerOrderRepository.saveAndFlush(so);
@@ -153,6 +197,8 @@ public class OrderPlacementService {
                 oi.setUnitPrice(line.unitPrice());
                 oi.setQuantity(line.quantity());
                 oi.setLineTotal(line.lineTotal());
+                oi.setAffiliateReferrerId(line.affiliate() == null ? null : line.affiliate().referrerId());
+                oi.setAffiliateRate(line.affiliate() == null ? null : line.affiliate().rate());
                 oi.setCreatedAt(now);
                 oi.setUpdatedAt(now);
                 orderItemRepository.save(oi);
@@ -160,8 +206,13 @@ public class OrderPlacementService {
             orderSubtotal = orderSubtotal.add(subtotal);
         }
 
-        order.setTotalAmount(orderSubtotal.add(totalShipping).subtract(discount).max(BigDecimal.ZERO)
-                .setScale(2, RoundingMode.HALF_UP));
-        return orderRepository.save(order);
+        order.setTotalAmount(orderSubtotal.add(totalShipping).subtract(discount).subtract(BigDecimal.valueOf(xuUsed))
+                .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+        orderRepository.save(order);
+
+        if ("installment".equals(request.paymentMethod())) {
+            installmentService.createRequest(order, userId, request.installmentMonths() == null ? 0 : request.installmentMonths());
+        }
+        return order;
     }
 }

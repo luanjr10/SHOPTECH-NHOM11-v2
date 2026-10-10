@@ -1,6 +1,7 @@
 package com.shoptech.modules.coupon.dto;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -24,6 +25,15 @@ public record CouponRequest(
         String type,
 
         String targetTier,
+
+        Boolean newCustomerOnly,
+
+        @Min(value = 0, message = "Thứ trong tuần không hợp lệ")
+        @Max(value = 6, message = "Thứ trong tuần không hợp lệ")
+        Integer weekday,
+
+        @Min(value = 1, message = "Giới hạn lượt mỗi ngày tối thiểu là 1")
+        Integer dailyLimit,
 
         @DecimalMin(value = "0", message = "Giá trị không được nhỏ hơn 0")
         BigDecimal value,

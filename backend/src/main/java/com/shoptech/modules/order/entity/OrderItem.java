@@ -30,6 +30,9 @@ public class OrderItem {
     private BigDecimal unitPrice;
     private Integer quantity;
     private BigDecimal lineTotal;
+    /** Người giới thiệu (affiliate) và tỉ lệ hoa hồng đã chốt lúc đặt hàng. */
+    private Long affiliateReferrerId;
+    private BigDecimal affiliateRate;
     private Instant createdAt;
     private Instant updatedAt;
 }

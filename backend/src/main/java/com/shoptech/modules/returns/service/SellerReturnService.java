@@ -3,6 +3,8 @@ package com.shoptech.modules.returns.service;
 import com.shoptech.common.exception.ApiException;
 import com.shoptech.common.exception.RequestValidator;
 import com.shoptech.common.mail.MailService;
+import com.shoptech.modules.affiliate.service.AffiliateService;
+import com.shoptech.modules.xu.service.XuService;
 import com.shoptech.common.response.PagedResult;
 import com.shoptech.common.response.Pagination;
 import com.shoptech.config.AppProperties;
@@ -51,6 +53,8 @@ public class SellerReturnService {
     private final SellerOrderService sellerOrderService;
     private final RequestValidator requestValidator;
     private final MailService mailService;
+    private final AffiliateService affiliateService;
+    private final XuService xuService;
     private final AppProperties props;
 
     @Transactional(readOnly = true)
@@ -93,6 +97,11 @@ public class SellerReturnService {
         r.setRespondedAt(now);
         r.setUpdatedAt(now);
         returnRepository.save(r);
+
+        if ("approved".equals(request.status())) {
+            affiliateService.cancelForSellerOrder(r.getSellerOrderId());
+            xuService.reverseEarnForSellerOrder(r.getSellerOrderId());
+        }
 
         ReturnRequestView result = view(r, null);
         afterCommit(() -> notifyCustomer(result));

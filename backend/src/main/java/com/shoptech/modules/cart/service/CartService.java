@@ -131,7 +131,7 @@ public class CartService {
             String sku = item.getSku() == null || item.getSku().isEmpty() ? null : item.getSku();
             if (product == null || !Objects.equals(product.getStatus(), 1)) {
                 lines.add(new CartSummary.Line(item.getId(),
-                        product == null ? null : new CartSummary.ProductRef(product.getId(), product.getName(), null, null),
+                        product == null ? null : new CartSummary.ProductRef(product.getId(), product.getName(), null, null, product.getStoreId()),
                         sku == null ? null : new CartSummary.Variant(sku, null),
                         item.getQuantity(), BigDecimal.ZERO, BigDecimal.ZERO, 0, true, false));
                 continue;
@@ -148,7 +148,7 @@ public class CartService {
             List<String> imgs = images.getOrDefault(product.getId(), List.of());
             lines.add(new CartSummary.Line(item.getId(),
                     new CartSummary.ProductRef(product.getId(), product.getName(), product.getSlug(),
-                            imgs.isEmpty() ? null : imgs.get(0)),
+                            imgs.isEmpty() ? null : imgs.get(0), product.getStoreId()),
                     sku == null ? null : CartSummary.Variant.of(sku, ProductPricing.findVariant(variants, sku)),
                     item.getQuantity(), unitPrice, lineSubtotal, available, false, insufficient));
         }

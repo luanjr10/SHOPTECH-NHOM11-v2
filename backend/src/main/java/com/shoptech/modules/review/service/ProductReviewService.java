@@ -7,6 +7,7 @@ import com.shoptech.common.response.Pagination;
 import com.shoptech.common.storage.CloudinaryService;
 import com.shoptech.common.storage.ImageRules;
 import com.shoptech.config.AppProperties;
+import com.shoptech.modules.xu.service.XuService;
 import com.shoptech.modules.product.repository.ProductRepository;
 import com.shoptech.modules.review.dto.ProductReviewPage;
 import com.shoptech.modules.review.entity.ProductReview;
@@ -53,6 +54,7 @@ public class ProductReviewService {
     private final CloudinaryService cloudinaryService;
     private final NamedParameterJdbcTemplate jdbc;
     private final AppProperties props;
+    private final XuService xuService;
 
     public record Submitted(ProductReviewPage.Item review, boolean created) {
     }
@@ -106,6 +108,9 @@ public class ProductReviewService {
         }
         review.setUpdatedAt(now);
         reviewRepository.save(review);
+        if (review.getOrderItemId() != null) {
+            xuService.earnForReview(userId, review.getId(), review.getImages() != null && !review.getImages().isEmpty());
+        }
         return new Submitted(item(review, userRepository.findById(userId).orElse(null)), created);
     }
 

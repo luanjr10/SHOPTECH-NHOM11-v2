@@ -1,6 +1,7 @@
 package com.shoptech.modules.order.dto;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -51,17 +52,27 @@ public record PlaceOrderRequest(
         String wardName,
 
         @NotBlank(message = "Vui lòng chọn phương thức thanh toán")
-        @Pattern(regexp = "cod|momo|vnpay|onepay|sepay", message = "Phương thức thanh toán không hợp lệ")
+        @Pattern(regexp = "cod|momo|vnpay|onepay|sepay|installment", message = "Phương thức thanh toán không hợp lệ")
         String paymentMethod,
 
         @Size(max = 50, message = "Mã giảm giá không hợp lệ")
-        String couponCode
+        String couponCode,
+
+        /** Dùng ShopTech Xu để giảm tiền hàng (tối đa theo luật của XuService). */
+        Boolean useXu,
+
+        /** Số kỳ trả góp (chỉ khi paymentMethod = installment). */
+        @Min(value = 1, message = "Số kỳ trả góp không hợp lệ")
+        @Max(value = 36, message = "Số kỳ trả góp không hợp lệ")
+        Integer installmentMonths
 ) {
 
     public record Item(
             @NotNull(message = "Sản phẩm không hợp lệ") Integer productId,
             String sku,
-            @NotNull(message = "Số lượng không hợp lệ") @Min(value = 1, message = "Số lượng phải lớn hơn 0") Integer quantity
+            @NotNull(message = "Số lượng không hợp lệ") @Min(value = 1, message = "Số lượng phải lớn hơn 0") Integer quantity,
+            /** Mã affiliate của người giới thiệu (từ link ?aff=), có thể trống. */
+            @Size(max = 12) String affCode
     ) {
     }
 }
