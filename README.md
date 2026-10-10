@@ -22,9 +22,9 @@ Hệ thống quản trị sàn thương mại điện tử bán đồ công ngh�
 - **Đơn hàng & Hoá đơn** — xem chi tiết đơn theo gian hàng, xuất hoá đơn PDF, gửi hoá đơn qua email
 - **Đánh giá & Theo dõi** — kiểm duyệt đánh giá sản phẩm, xem người theo dõi gian hàng
 - **Hoa hồng** — tỉ lệ hoa hồng mặc định / theo danh mục / theo gian hàng
-- **Voucher** — mã giảm % / số tiền / miễn phí vận chuyển, giới hạn theo hạng khách hàng
 - **Rút tiền** — duyệt, từ chối, giải ngân qua MoMo / VNPay / OnePay / SePay (sandbox)
 - **Quỹ sàn** — tiền đang giữ hộ người bán, tiền đã quyết toán, tổng đã chi trả
+- **Hỗ trợ khách (chat)** — hộp thư hỗ trợ của sàn, nhân viên có quyền `support_chat` trả lời kèm ảnh / tệp đính kèm
 - **Cài đặt tài khoản** — hồ sơ, ảnh đại diện, đổi mật khẩu, đăng xuất thiết bị khác
 - **Đăng ký / Đăng nhập** — đăng ký, đăng nhập (mật khẩu hoặc Google), quên mật khẩu bằng mã email, xác thực email
 
@@ -43,6 +43,11 @@ Người bán đăng nhập chung trang quản trị, menu hiển thị theo vai
 - **Doanh thu** — số đơn hoàn tất, tổng giá trị đơn, hoa hồng sàn, doanh thu thực nhận theo 7 / 30 / 90 ngày, biểu đồ theo ngày
 - **Ví** — tổng số dư, tiền đang giữ, tiền có thể rút, lịch sử biến động ví
 - **Rút tiền** — tạo yêu cầu rút (chuyển khoản / MoMo / VNPay / OnePay / SePay), theo dõi trạng thái duyệt
+- **Voucher** — gian hàng tự phát mã giảm % / số tiền / miễn phí vận chuyển (theo hạng khách, khách mới, theo thứ trong tuần, công khai); khoản giảm do gian hàng chịu
+- **Bán trả góp** — bật trả góp, đặt kỳ hạn + lãi, xem hồ sơ khách và chấp nhận / từ chối từng yêu cầu; tiền mỗi kỳ về ví gian hàng
+- **Affiliate** — chọn sản phẩm chạy affiliate và % hoa hồng từng sản phẩm, chi trả hoa hồng cho khách qua MoMo (sandbox)
+- **Thu cũ đổi mới** — bảng giá thu theo dòng máy, duyệt yêu cầu của khách và phát voucher riêng
+- **Chat với khách** — hộp thư khách hàng của gian hàng, gửi ảnh / tệp
 - **Cài đặt gian hàng** — thông tin gian hàng, địa chỉ lấy hàng theo danh mục tỉnh / quận / phường của Giao Hàng Nhanh
 
 ### Trang khách hàng (frontend/client)
@@ -59,6 +64,13 @@ Người bán đăng nhập chung trang quản trị, menu hiển thị theo vai
 - **Hồ sơ & cài đặt chung** — hồ sơ, ảnh đại diện, đơn hàng của tôi (xem / huỷ, xác nhận đã nhận hàng), hạng thành viên & nhận voucher theo hạng, sổ địa chỉ (tỉnh / quận / phường GHN), đổi mật khẩu, đăng xuất thiết bị khác
 - **Kênh người bán** — gửi đơn đăng ký mở gian hàng, theo dõi trạng thái duyệt
 - **Gian hàng & chi tiết shop** — danh sách gian hàng (tìm kiếm, sắp xếp), trang shop với chỉ số uy tín, danh mục, sản phẩm, theo dõi gian hàng
+- **Voucher & ShopTech Xu** — ví voucher (theo hạng cần bấm Nhận, khách mới, mã theo thứ trong tuần, mã công khai của gian hàng); điểm danh nhận xu, xu thưởng khi đơn hoàn tất / viết đánh giá, dùng xu giảm tiền (tối đa 50% giá trị hàng)
+- **Trả góp** — mua trả góp theo kỳ hạn của từng gian hàng, thanh toán từng kỳ qua MoMo (sandbox), email nhắc kỳ sắp đến hạn / quá hạn mỗi ngày 08:00
+- **Affiliate** — danh sách sản phẩm đang trả hoa hồng, sao chép link giới thiệu, ví affiliate theo từng gian hàng và rút về ví MoMo
+- **Thu cũ đổi mới** — báo giá thu mua theo tình trạng máy, gửi yêu cầu kèm ảnh, nhận voucher dùng cho đơn mua tại gian hàng
+- **Yêu thích & báo giảm giá** — lưu sản phẩm, đặt mức giá mong muốn, nhận email khi giá giảm
+- **So sánh sản phẩm** — so sánh 2–3 sản phẩm theo bảng thông số kèm lời tư vấn AI (Groq)
+- **Chat** — nhắn tin với gian hàng hoặc đội hỗ trợ ShopTech, gửi ảnh / tệp đính kèm
 - **Yêu cầu hoàn trả / Bảo hành** — gửi yêu cầu hoàn trả hoặc bảo hành kèm ảnh minh chứng cho sản phẩm trong đơn đã hoàn tất
 
 ## Phân công
@@ -97,5 +109,7 @@ cd frontend/admin   # hoặc: cd frontend/client
 npm install
 npm run dev
 ```
+
+Cơ sở dữ liệu: các chức năng bổ sung (xu, trả góp, affiliate, thu cũ, chat, yêu thích, voucher của gian hàng) cần chạy một lần script `backend/database/extra-features.sql` trên database hiện có.
 
 Backend chạy ở `http://localhost:8000`, trang quản trị ở `http://localhost:5173`, trang khách hàng ở `http://localhost:5175`.
